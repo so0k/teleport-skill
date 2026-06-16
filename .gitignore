@@ -1,0 +1,5 @@
+# skill-creator eval workspaces (kept local, not part of the published skill)
+*-workspace/
+__pycache__/
+*.pyc
+.DS_Store
