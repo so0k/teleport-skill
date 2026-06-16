@@ -5,15 +5,17 @@ Backed by Teleport's own published, agent-friendly endpoints:
   - https://goteleport.com/docs/llms.txt  — the page index (Title/URL/description, by section)
   - https://goteleport.com/docs/<path>.md — clean markdown for any docs page (token-counted)
 
-Three things the model does, escalating only as far as the question needs:
-  search   lexical search over the cached llms.txt index   (no page bodies -> cheap)
+Four things the model does, escalating only as far as the question needs:
+  search   TF-IDF content search over a pre-built index (references/search-index.json)
+           Falls back to lexical title/description search if the index is missing.
   fetch    pull one page's clean markdown, windowed         (context-bounded)
   related  list sibling pages in the same index section     (fan out to adjacent topics)
-  refresh  re-download llms.txt (the entire maintenance story)
+  refresh  re-download llms.txt + rebuild the search index  (the entire maintenance story)
 
 stdlib only; network only on `fetch`/`refresh`.
 """
 import argparse
+import json
 import os
 import re
 import sys
@@ -22,7 +24,10 @@ import urllib.error
 
 DOCS_BASE = "https://goteleport.com/docs"
 LLMS_URL = f"{DOCS_BASE}/llms.txt"
-MANIFEST = os.path.join(os.path.dirname(__file__), "..", "references", "llms.txt")
+SCRIPT_DIR = os.path.dirname(__file__)
+REFERENCES = os.path.join(SCRIPT_DIR, "..", "references")
+MANIFEST = os.path.join(REFERENCES, "llms.txt")
+INDEX_FILE = os.path.join(REFERENCES, "search-index.json")
 DEFAULT_MAX_CHARS = 5000
 
 LINK_RE = re.compile(r"^\-\s*\[(?P<title>[^\]]+)\]\((?P<url>[^)]+)\)\s*:?\s*(?P<desc>.*)$")
@@ -66,7 +71,61 @@ def _terms(text: str):
     return [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 1]
 
 
+def _load_index():
+    """Load the TF-IDF search index from disk, or return None if missing."""
+    if not os.path.exists(INDEX_FILE):
+        return None
+    with open(INDEX_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def cmd_search(args):
+    """TF-IDF content search with lexical fallback."""
+    idx = _load_index()
+
+    if idx:
+        _search_tfidf(args, idx)
+    else:
+        _search_lexical(args)
+
+
+def _search_tfidf(args, idx: dict):
+    """Search page content using the pre-built TF-IDF index."""
+    q_terms = _terms(args.query)
+    if not q_terms:
+        sys.exit("empty query after removing stop words; be more specific")
+
+    docs = idx["docs"]
+    index = idx["index"]
+    scores: dict[int, float] = {}
+
+    for term in set(q_terms):
+        postings = index.get(term, {})
+        for doc_idx_str, weight in postings.items():
+            doc_idx = int(doc_idx_str)
+            scores[doc_idx] = scores.get(doc_idx, 0) + weight
+
+    if not scores:
+        # Fall back to lexical if TF-IDF finds nothing
+        _search_lexical(args)
+        return
+
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    print(f"# {len(ranked)} results for: {args.query}  (TF-IDF content search)\n")
+
+    for i, (doc_idx, score) in enumerate(ranked[: args.limit]):
+        doc = docs[doc_idx]
+        print(f"[{doc['title']}]({doc['url']})")
+        if doc.get("preview"):
+            print(f"    {doc['preview'][:300]}")
+        if doc.get("desc"):
+            print(f"    — {doc['desc']}")
+        print(f"    — score: {score:.1f}")
+        print()
+
+
+def _search_lexical(args):
+    """Fallback: lexical search over llms.txt titles and descriptions."""
     entries = load_manifest()
     q = _terms(args.query)
     if not q:
@@ -75,7 +134,6 @@ def cmd_search(args):
     for e in entries:
         title_t = _terms(e["title"])
         desc_t = _terms(e["desc"])
-        # url path slug words are strong signal (e.g. "machine-id", "tbot")
         slug_t = _terms(e["url"].replace("/", " ").replace("-", " ").replace(".md", ""))
         sec_t = _terms(e["section"])
         score = 0
@@ -88,7 +146,6 @@ def cmd_search(args):
                 score += 2
             if term in sec_t:
                 score += 1
-            # substring fallback for partial matches (e.g. "rbac" in "rbacs")
             if score == 0 and term in e["title"].lower():
                 score += 1
         if score:
@@ -98,6 +155,7 @@ def cmd_search(args):
         print(f"No matches for: {args.query}")
         print("Try broader terms, or `refresh` if the index is stale.")
         return
+    print(f"# {len(scored)} results for: {args.query}  (lexical title search — build index with `refresh --index`)\n")
     for score, e in scored[: args.limit]:
         print(f"[{e['title']}]({e['url']})")
         if e["desc"]:
@@ -206,12 +264,24 @@ def cmd_refresh(args):
         1 for ln in data.splitlines() if LINK_RE.match(ln))
     print(f"refreshed {MANIFEST}\n{n} pages indexed from {LLMS_URL}")
 
+    if args.index:
+        print("\nbuilding TF-IDF search index ...")
+        import subprocess
+        indexer = os.path.join(SCRIPT_DIR, "teleport_index.py")
+        result = subprocess.run(
+            [sys.executable, indexer],
+            capture_output=True, text=True, timeout=600
+        )
+        print(result.stderr)
+        if result.returncode != 0:
+            print(f"warning: index build failed (exit {result.returncode})")
+
 
 def main():
     p = argparse.ArgumentParser(description="Search & read the Teleport docs.")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("search", help="lexical search over the cached llms.txt index")
+    s = sub.add_parser("search", help="TF-IDF content search (lexical fallback if index missing)")
     s.add_argument("query")
     s.add_argument("--limit", type=int, default=10)
     s.set_defaults(func=cmd_search)
@@ -227,7 +297,8 @@ def main():
     r.add_argument("url")
     r.set_defaults(func=cmd_related)
 
-    rf = sub.add_parser("refresh", help="re-download llms.txt")
+    rf = sub.add_parser("refresh", help="re-download llms.txt; --index to rebuild search index")
+    rf.add_argument("--index", action="store_true", help="also rebuild the TF-IDF search index")
     rf.set_defaults(func=cmd_refresh)
 
     args = p.parse_args()

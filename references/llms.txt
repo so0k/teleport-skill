@@ -357,7 +357,7 @@
 - [Database Access with AlloyDB](https://goteleport.com/docs/enroll-resources/database-access/enrollment/google-cloud/alloydb.md): How to configure Teleport database access with AlloyDB.
 - [Database Access with Cloud SQL for MySQL](https://goteleport.com/docs/enroll-resources/database-access/enrollment/google-cloud/mysql-cloudsql.md): How to configure Teleport database access with Cloud SQL for MySQL.
 - [Database Access with Cloud SQL for PostgreSQL](https://goteleport.com/docs/enroll-resources/database-access/enrollment/google-cloud/postgres-cloudsql.md): How to configure Teleport database access with Cloud SQL for PostgreSQL.
-- [Database Access with Cloud Spanner](https://goteleport.com/docs/enroll-resources/database-access/enrollment/google-cloud/spanner.md): How to configure Teleport database access with GCP's Cloud Spanner.
+- [Database Access with Cloud Spanner](https://goteleport.com/docs/enroll-resources/database-access/enrollment/google-cloud/spanner.md): Configure Teleport database access with Google Cloud Spanner.
 - [Enroll Managed Databases](https://goteleport.com/docs/enroll-resources/database-access/enrollment/managed.md): Provides instructions on protecting managed databases in your infrastructure with Teleport.
 - [Database Access with MongoDB Atlas](https://goteleport.com/docs/enroll-resources/database-access/enrollment/managed/mongodb-atlas.md): How to configure Teleport database access with MongoDB Atlas.
 - [Database Access with Oracle Exadata](https://goteleport.com/docs/enroll-resources/database-access/enrollment/managed/oracle-exadata.md): How to configure Teleport database access with Oracle Exadata.
