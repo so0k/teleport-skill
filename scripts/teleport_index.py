@@ -52,7 +52,7 @@ STOP_WORDS = {
     "both", "few", "more", "most", "up", "out", "when", "where", "which",
     "what", "who", "how", "why", "here", "there", "now", "get", "set",
     "use", "using", "used", "see", "make", "made", "need", "like", "one",
-    "two", "how", "i", "my", "me", "teleport",
+    "two", "i", "my", "me", "teleport",
 }
 
 def tokenize(text: str) -> list[str]:
@@ -63,12 +63,38 @@ def tokenize(text: str) -> list[str]:
 
 # ── page fetching ───────────────────────────────────────────────────────────
 
-def _http_get(url: str) -> str:
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "teleport-index-builder/1.0"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode("utf-8", "replace")
+_REQUEST_SLEEP = 0.2  # seconds between requests
+
+
+def _http_get(url: str, retries: int = 3) -> str:
+    """Fetch a URL with exponential backoff on transient errors."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "teleport-index-builder/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            # Don't retry 4xx (except 429); retry 5xx
+            if e.code == 429:
+                retry_after = e.headers.get("Retry-After", "5")
+                try:
+                    wait = int(retry_after)
+                except ValueError:
+                    wait = 5
+                if attempt < retries - 1:
+                    time.sleep(max(wait, 2 ** attempt))
+                    continue
+            elif 400 <= e.code < 500:
+                raise
+            last_err = e
+        except (urllib.error.URLError, OSError) as e:
+            last_err = e
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)
+    raise last_err  # type: ignore[reportPossiblyUnboundVariable]
 
 
 def parse_llms_txt(path: Path) -> list[dict]:
@@ -95,10 +121,11 @@ def parse_llms_txt(path: Path) -> list[dict]:
     return entries
 
 
-def fetch_page_md(url: str) -> str:
+def fetch_page_md(url: str, sleep: float = _REQUEST_SLEEP) -> str:
     """Fetch a docs page as clean markdown (strips the token_count header)."""
     if not url.endswith(".md"):
         url = url.rstrip("/") + ".md"
+    time.sleep(sleep)
     raw = _http_get(url)
     # Drop the leading {"token_count": N} line if present
     lines = raw.splitlines()
@@ -119,6 +146,7 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
     doc_vectors: list[Counter] = []  # per-doc term → count
     docs_meta: list[dict] = []       # url, title, desc, preview per doc
     total = len(entries)
+    failed: list[str] = []           # URLs that couldn't be fetched
 
     for i, entry in enumerate(entries):
         if progress and (i % 50 == 0 or i == total - 1):
@@ -127,6 +155,8 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
             md = fetch_page_md(entry["url"])
         except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
             print(f"\n  skip {entry['url']}: {e}", file=sys.stderr)
+            failed.append(entry["url"])
+            # Still store metadata so lookup by index works for successful docs
             docs_meta.append({
                 "url": entry["url"],
                 "title": entry["title"],
@@ -140,17 +170,29 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
         text_lines = []
         preview_lines = []
         in_fence = False
+        fence_marker = ""
         for line in md.splitlines():
-            if line.startswith("```"):
-                in_fence = not in_fence
+            # Match code-fence markers (``` with optional language), track the
+            # opening backtick run length to handle nested/longer fences correctly.
+            fm = re.match(r"^(```+)\s*", line)
+            if fm:
+                marker = fm.group(1)
+                if not in_fence:
+                    in_fence = True
+                    fence_marker = marker
+                elif marker == fence_marker:
+                    in_fence = False
+                    fence_marker = ""
                 continue
             if in_fence:
                 continue
             stripped = line.lstrip("#").strip()
-            if not stripped or stripped.startswith("[") and stripped.endswith(")"):
+            # check original line for heading (before stripping #)
+            is_heading = line.lstrip().startswith("#")
+            if not stripped or (stripped.startswith("[") and stripped.endswith(")")):
                 continue
             text_lines.append(line)
-            if len(preview_lines) < 8 and not stripped.startswith("#"):
+            if len(preview_lines) < 8 and not is_heading:
                 preview_lines.append(stripped)
         text = " ".join(text_lines)
         preview = " ".join(preview_lines)[:500]
@@ -167,19 +209,30 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
     if progress:
         print("", file=sys.stderr)
 
+    # Only count docs that actually have content (not empty Counter from failed fetches)
+    non_empty = sum(1 for vec in doc_vectors if len(vec) > 0)
+    if progress and failed:
+        print(f"  {len(failed)} page(s) failed to fetch:"
+              + "".join(f"\n    - {u}" for u in failed[:5])
+              + (f"\n    ... and {len(failed) - 5} more" if len(failed) > 5 else ""),
+              file=sys.stderr)
+        print(f"  index built from {non_empty}/{total} successfully fetched pages",
+              file=sys.stderr)
+
     # Compute document frequencies
     N = len(doc_vectors)
     df: Counter = Counter()  # term → number of docs containing it
     for vec in doc_vectors:
         df.update(set(vec.keys()))
 
-    # Compute TF-IDF weights and build sparse index
+    # Build sparse index with deterministic ordering
     # IDF = log((N + 1) / (df + 1)) + 1  (smooth)
     # TF  = 1 + log(count)               (sublinear)
     # Weight = TF * IDF, stored per (term, doc_idx)
     index: dict[str, dict[str, float]] = {}
 
-    for term, doc_freq in df.items():
+    for term in sorted(df):
+        doc_freq = df[term]
         idf = math.log((N + 1) / (doc_freq + 1)) + 1
         postings: dict[str, float] = {}
         for doc_idx, vec in enumerate(doc_vectors):
@@ -193,7 +246,7 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
     return {
         "version": 1,
         "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "doc_count": N,
+        "doc_count": non_empty,
         "docs": docs_meta,
         "index": index,
     }
@@ -233,7 +286,7 @@ def main():
     # 4. Save
     REFERENCES.mkdir(parents=True, exist_ok=True)
     with open(INDEX_FILE, "w", encoding="utf-8") as f:
-        json.dump(index_data, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump(index_data, f, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     size_kb = INDEX_FILE.stat().st_size / 1024
     print(f"  saved {INDEX_FILE} ({size_kb:.0f} KB)", file=sys.stderr)
     print(f"\nBuilt search index from {index_data['doc_count']} pages. "

@@ -33,9 +33,10 @@ DEFAULT_MAX_CHARS = 5000
 LINK_RE = re.compile(r"^\-\s*\[(?P<title>[^\]]+)\]\((?P<url>[^)]+)\)\s*:?\s*(?P<desc>.*)$")
 # words we don't want to weight in lexical scoring
 STOP = {
-    "the", "a", "an", "to", "of", "for", "and", "or", "in", "on", "with", "how",
+    "the", "a", "an", "to", "of", "for", "and", "or", "in", "on", "with",
     "do", "i", "is", "are", "my", "me", "can", "use", "using", "teleport", "set",
     "up", "get", "what", "when", "where", "which", "guide", "docs", "doc",
+    "how",
 }
 
 
@@ -68,15 +69,23 @@ def load_manifest():
 
 
 def _terms(text: str):
-    return [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 1]
+    tokens = [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 1]
+    if not tokens and text.strip():
+        # Query had content but produced no tokens — likely non-ASCII (the index
+        # is English/ASCII-only).
+        sys.exit("no indexable terms in query; the search index is English/ASCII-only")
+    return tokens
 
 
 def _load_index():
-    """Load the TF-IDF search index from disk, or return None if missing."""
+    """Load the TF-IDF search index from disk, or return None if missing/corrupt."""
     if not os.path.exists(INDEX_FILE):
         return None
-    with open(INDEX_FILE, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(INDEX_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def cmd_search(args):
@@ -86,7 +95,7 @@ def cmd_search(args):
     if idx:
         _search_tfidf(args, idx)
     else:
-        _search_lexical(args)
+        _search_lexical(args, reason="index_missing")
 
 
 def _search_tfidf(args, idx: dict):
@@ -106,14 +115,17 @@ def _search_tfidf(args, idx: dict):
             scores[doc_idx] = scores.get(doc_idx, 0) + weight
 
     if not scores:
-        # Fall back to lexical if TF-IDF finds nothing
-        _search_lexical(args)
+        # Fall back to lexical if TF-IDF finds nothing — index exists but
+        # query terms don't match any indexed content.
+        _search_lexical(args, reason="no_term_matches")
         return
 
     ranked = sorted(scores.items(), key=lambda x: -x[1])
-    print(f"# {len(ranked)} results for: {args.query}  (TF-IDF content search)\n")
+    displayed = min(len(ranked), args.limit)
+    built = idx.get("built", "unknown date")
+    print(f"# {displayed} of {len(ranked)} results for: {args.query}  (TF-IDF content search, index built {built})\n")
 
-    for i, (doc_idx, score) in enumerate(ranked[: args.limit]):
+    for _, (doc_idx, score) in enumerate(ranked[: args.limit]):
         doc = docs[doc_idx]
         print(f"[{doc['title']}]({doc['url']})")
         if doc.get("preview"):
@@ -124,7 +136,7 @@ def _search_tfidf(args, idx: dict):
         print()
 
 
-def _search_lexical(args):
+def _search_lexical(args, reason=None):
     """Fallback: lexical search over llms.txt titles and descriptions."""
     entries = load_manifest()
     q = _terms(args.query)
@@ -155,7 +167,11 @@ def _search_lexical(args):
         print(f"No matches for: {args.query}")
         print("Try broader terms, or `refresh` if the index is stale.")
         return
-    print(f"# {len(scored)} results for: {args.query}  (lexical title search — build index with `refresh --index`)\n")
+    if reason == "index_missing":
+        header = f"# {len(scored)} results for: {args.query}  (lexical title search — build index with `refresh --index`)\n"
+    else:
+        header = f"# {len(scored)} results for: {args.query}  (lexical title search)\n"
+    print(header)
     for score, e in scored[: args.limit]:
         print(f"[{e['title']}]({e['url']})")
         if e["desc"]:
@@ -260,8 +276,7 @@ def cmd_refresh(args):
     os.makedirs(os.path.dirname(MANIFEST), exist_ok=True)
     with open(MANIFEST, "w", encoding="utf-8") as f:
         f.write(data)
-    n = len(LINK_RE.findall(data)) if False else sum(
-        1 for ln in data.splitlines() if LINK_RE.match(ln))
+    n = sum(1 for ln in data.splitlines() if LINK_RE.match(ln))
     print(f"refreshed {MANIFEST}\n{n} pages indexed from {LLMS_URL}")
 
     if args.index:
@@ -270,9 +285,8 @@ def cmd_refresh(args):
         indexer = os.path.join(SCRIPT_DIR, "teleport_index.py")
         result = subprocess.run(
             [sys.executable, indexer],
-            capture_output=True, text=True, timeout=600
+            timeout=600
         )
-        print(result.stderr)
         if result.returncode != 0:
             print(f"warning: index build failed (exit {result.returncode})")
 
