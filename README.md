@@ -65,5 +65,7 @@ python3 scripts/teleport_docs.py fetch https://goteleport.com/docs/machine-workl
 ## License
 
 MIT — see [LICENSE](LICENSE). Teleport documentation content is © Gravitational, Inc. and is
-fetched live from goteleport.com; this repo only contains the skill wrapper and a cached copy of
-the public docs index.
+fetched live from goteleport.com. This repo contains the skill wrapper, a cached copy of
+the public docs index (`llms.txt`), and a pre-built TF-IDF search index
+(`references/search-index.json`) which includes short page-text previews from the live
+docs endpoints.
