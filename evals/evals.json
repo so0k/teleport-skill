@@ -1,0 +1,23 @@
+{
+  "skill_name": "teleport-docs",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "We're rolling out Teleport for the team and want SSO through Microsoft Entra ID (Azure AD) using OIDC. How do I set up the OIDC auth connector for Entra ID, and how do I map Entra ID group claims to Teleport roles? I need the exact connector spec fields, especially how the claims-to-roles mapping is written.",
+      "expected_output": "Grounded answer citing Teleport's Entra ID / Azure AD OIDC SSO docs (zero-trust-access/sso/*) with goteleport.com URL(s). Must name the exact OIDC connector spec fields as written in the docs — e.g. redirect_url, client_id/client_secret, and the claims_to_roles mapping (claim/value/roles) — and explain mapping Entra ID groups to Teleport roles. No invented field names.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Heads up, I'm confused: after we added request_access to one of our Teleport roles, those users now get prompted to make an access request every single time they log in, which we did not intend. What does the request_access role option actually do, what values can it take, and how do we stop the every-login prompt while keeping access requests available when needed?",
+      "expected_output": "Grounded answer citing the Teleport role options / Access Requests docs with URL. Must correctly identify options.request_access as a role option, list its valid values (e.g. optional, always, reason) as documented, explain that 'always' is what forces the prompt on every login, and recommend the value that removes the forced prompt (optional/reason). Should not confuse it with the spec.allow.request block.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "As part of our Teleport rollout we want just-in-time access: a user requests an elevated role and a reviewer approves it before it's granted. How do I configure Access Requests — which role fields define what a user is allowed to request, and which fields define who can review/approve requests?",
+      "expected_output": "Grounded answer citing the Teleport Access Requests docs (identity-governance/access-requests/*) with URL(s). Must name the exact role spec fields: what a user can request (spec.allow.request.roles and/or search_as_roles) and who can review (spec.allow.review_requests). Quoted from docs, not invented.",
+      "files": []
+    }
+  ]
+}
