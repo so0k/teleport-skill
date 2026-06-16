@@ -18,6 +18,18 @@
       "prompt": "As part of our Teleport rollout we want just-in-time access: a user requests an elevated role and a reviewer approves it before it's granted. How do I configure Access Requests — which role fields define what a user is allowed to request, and which fields define who can review/approve requests?",
       "expected_output": "Grounded answer citing the Teleport Access Requests docs (identity-governance/access-requests/*) with URL(s). Must name the exact role spec fields: what a user can request (spec.allow.request.roles and/or search_as_roles) and who can review (spec.allow.review_requests). Quoted from docs, not invented.",
       "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We want to manage long-lived team access with periodic reviews instead of ad-hoc role grants — for example an 'on-call-db-admins' Access List that a team owner reviews every quarter, where membership grants specific Teleport roles. How do I set up an Access List, and which fields define the owners, the members, the roles/traits it grants, and the review frequency?",
+      "expected_output": "Grounded answer citing the Teleport Access Lists docs (identity-governance/access-lists/*) with URL(s). Must name the exact resource spec fields: owners, members/membership, grants (grants.roles and grants.traits), and the periodic-review / audit recurrence configuration (audit, recurrence/frequency). Quoted from docs, not invented.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "We're getting flooded with Access Request notifications. How do I use Access Monitoring Rules to route Access Request notifications to a specific Slack channel based on the requested roles, and (if possible) auto-approve certain low-risk requests? What does the access_monitoring_rule spec look like — the condition, the notification/recipients, and any automatic-review fields?",
+      "expected_output": "Grounded answer citing the Teleport Access Monitoring Rules docs (identity-governance/access-requests/notification-routing-rules and/or reference/access-controls/access-monitoring-rules) with URL(s). Must name the access_monitoring_rule resource kind and exact spec fields: spec.subjects, spec.condition (the predicate), spec.notification (name/recipients), and the automatic_review/desired_state fields where applicable. Quoted from docs, not invented.",
+      "files": []
     }
   ]
 }
