@@ -60,6 +60,29 @@ Escalate only as far as the question needs.
    python3 scripts/teleport_docs.py related <url>
    ```
 
+## Generating config, IaC, or predicate expressions
+
+Teleport YAML, Terraform/Kubernetes-operator resources, and `where`/`condition` predicate
+expressions are the things models most often hallucinate — invented field names, the wrong
+nesting, attributes guessed as blocks, or expression syntax borrowed from the wrong context.
+Don't write these from memory. Before emitting a resource or an expression, fetch the exact
+schema and quote it:
+
+- **Terraform / IaC resource shape** — fetch the specific provider resource page, which lists
+  every attribute, its type, and required/optional status (and a working example). The pages are
+  `reference/infrastructure-as-code/terraform-provider/resources/<resource>.md` (e.g.
+  `…/resources/access_monitoring_rule.md`, `…/resources/access_list.md`, `…/resources/role.md`).
+  Search for the resource name to find the page, then `fetch` it.
+- **Predicate expressions** (`where` clauses, Access Monitoring Rule `condition`, label
+  expressions, resource-filter `--query`) — fetch
+  `reference/access-controls/predicate-language.md`. The syntax is **context-specific**, so read
+  the section for your context rather than assuming. For example, an Access Monitoring Rule
+  `condition` draws from fields like `access_request.spec.roles` and `user.traits` and uses
+  functions `contains` / `contains_any` / `contains_all` / `regexp.match` (e.g.
+  `access_request.spec.roles.contains("on-call-db")`) — which is **not** the same operator/field
+  set used to scope allow/deny rules inside a role. Confirm the field names and function forms
+  on the page before composing the expression.
+
 ## Grounding rules
 
 These keep answers trustworthy — they're the reason to use the skill at all:

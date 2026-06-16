@@ -30,6 +30,30 @@
       "prompt": "We're getting flooded with Access Request notifications. How do I use Access Monitoring Rules to route Access Request notifications to a specific Slack channel based on the requested roles, and (if possible) auto-approve certain low-risk requests? What does the access_monitoring_rule spec look like — the condition, the notification/recipients, and any automatic-review fields?",
       "expected_output": "Grounded answer citing the Teleport Access Monitoring Rules docs (identity-governance/access-requests/notification-routing-rules and/or reference/access-controls/access-monitoring-rules) with URL(s). Must name the access_monitoring_rule resource kind and exact spec fields: spec.subjects, spec.condition (the predicate), spec.notification (name/recipients), and the automatic_review/desired_state fields where applicable. Quoted from docs, not invented.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I'm setting up an Access Monitoring Rule in Teleport to auto-approve requests for the `staging-db-access` role and ping our `#access-requests` Slack channel. I wrote `condition: access_request.roles.contains_any(\"staging-db-access\")` but it never fires. What's the correct condition expression to match when that role is requested, and how do I add the auto-approval and Slack parts? Give me the Terraform resource.",
+      "expected_output": "Corrects the predicate to use the field access_request.spec.roles (NOT access_request.roles) with a valid function form (access_request.spec.roles.contains(\"staging-db-access\") or contains(access_request.spec.roles, \"staging-db-access\")). Terraform teleport_access_monitoring_rule with spec.automatic_review.integration = \"builtin\", automatic_review.decision = \"APPROVED\", desired_state = \"reviewed\", notification.name = \"slack\", notification.recipients. Cites the predicate-language and/or access-monitoring-rule reference URLs. Community discriminator #1.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "My `teleport_role` Terraform resource won't plan. I wrote it like a normal provider with `spec { allow { logins = [\"ubuntu\"] rules { resources = [\"node\"] verbs = [\"list\",\"read\"] } } }` and Terraform complains about block types. What's the right structure for a role with those logins and that rule?",
+      "expected_output": "Explains the Teleport provider uses nested attributes with '=', not HCL blocks. Correct: spec = { allow = { logins = [...] rules = [{ resources=[...] verbs=[...] }] } }. rules is a list of objects. Cites terraform-provider/resources/role.md. Community discriminator #7.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "I'm defining a Teleport Access List in Terraform for our `prod-oncall` group: owners should review membership quarterly, and members should receive the `prod-access` role. I keep getting validation errors on the audit recurrence, and I'm unclear which field actually grants the role. Can you give me the correct grants, owners, and audit recurrence for the teleport_access_list resource?",
+      "expected_output": "teleport_access_list with spec.audit.recurrence.frequency = 3 (quarterly is the '3months' enum, value 3) and day_of_month one of 1/15/31; spec.grants.roles = [\"prod-access\"] is what membership confers (NOT owners, NOT membership_requires); spec.owners list. Cites terraform-provider/resources/access_list.md. Community discriminator #8.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "I connected Teleport to Microsoft Entra ID via OIDC and added a claims_to_roles entry mapping the groups claim value `Platform-Engineers` to my `access` role, but no users get the role. In the audit log the groups claim is full of GUIDs like a1b2c3d4-1234-.... How am I supposed to map this?",
+      "expected_output": "Explains Entra emits the groups claim as group OBJECT IDs (GUIDs), so claims_to_roles value must be the GUID, not the display name. Mentions the groups overage limit (~200) and entra_id_groups_provider / Graph permission for large group counts. Cites entra-id-oidc docs. Community discriminator #3.",
+      "files": []
     }
   ]
 }
