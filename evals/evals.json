@@ -54,6 +54,36 @@
       "prompt": "I connected Teleport to Microsoft Entra ID via OIDC and added a claims_to_roles entry mapping the groups claim value `Platform-Engineers` to my `access` role, but no users get the role. In the audit log the groups claim is full of GUIDs like a1b2c3d4-1234-.... How am I supposed to map this?",
       "expected_output": "Explains Entra emits the groups claim as group OBJECT IDs (GUIDs), so claims_to_roles value must be the GUID, not the display name. Mentions the groups overage limit (~200) and entra_id_groups_provider / Graph permission for large group counts. Cites entra-id-oidc docs. Community discriminator #3.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "How do I find the EKPub hash for a TPM join token so my bot can join? I'm deploying tbot on a Linux host with TPM-based joining.",
+      "expected_output": "Surfaces and cites machine-workload-identity/deployment/linux-tpm.md. CONTENT-DEPENDENT eval: the discriminating terms (EKPub, EKCert, `tbot tpm identify`) appear only in the page BODY, not in its llms.txt title/description/slug — so a title-only lexical search misses it (rank 0) while full-text search ranks it #1. Tests body-only retrieval.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Our bot suddenly stopped renewing and tbot logs a certificate generation mismatch and says the bot is locked. What causes generation mismatch / a locked renewable cert and how do we recover?",
+      "expected_output": "Surfaces and cites machine-workload-identity/troubleshooting.md. CONTENT-DEPENDENT eval: the whole query is built from error strings ('generation mismatch', 'locked', 'renewable cert') that live only in body text; title-only lexical search misses entirely (rank 0). Tests diagnostic/error-string retrieval.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "I want to restrict session recordings so a user can only replay sessions they actually participated in. Which role spec field and where-clause do I use for session RBAC?",
+      "expected_output": "Surfaces and cites reference/access-controls/roles.md and names the body-only tokens (session.participants / session.proto and the where clause). CONTENT-DEPENDENT eval: the page title ('Teleport Roles') shares no query terms, so title-only lexical scores 0 while full-text ranks #1.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "We need to cap how long elevated privileges last after an access request is approved — say fourteen days max. Which field sets the maximum elevated session duration?",
+      "expected_output": "Surfaces and cites identity-governance/access-requests/access-request-configuration.md and names max_duration. CONTENT-DEPENDENT eval: the field name appears only in body, not the title/description; title-only lexical ranks 0, full-text ranks #1.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "I'm enrolling a self-hosted Postgres database with Teleport and need it to require client certificates. What pg_hba.conf settings and hostssl entry do I need so only certificate-authenticated connections are allowed?",
+      "expected_output": "Surfaces and cites enroll-resources/database-access/enrollment/self-hosted/postgres-self-hosted.md and the pg_hba.conf / hostssl entries. CONTENT-DEPENDENT eval: external-tool config tokens (pg_hba.conf, hostssl) are body-only; title-only lexical ranks 0, full-text ranks #1.",
+      "files": []
     }
   ]
 }
