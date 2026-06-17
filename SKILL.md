@@ -14,7 +14,6 @@ description: >-
 metadata:
   source: https://goteleport.com/docs/llms.txt
   page_endpoints: "https://goteleport.com/docs/<path>.md (clean markdown, token-counted)"
-  search_index: "references/search-index.json — pre-built TF-IDF index over all page content"
   tracks: "latest major version (the live site; currently v18)"
 ---
 
@@ -22,9 +21,8 @@ metadata:
 
 Answer Teleport questions from the official docs, not from memory. Teleport adds resource
 kinds, role fields, and CLI flags every release and renames things across major versions, so
-a remembered answer is often quietly out of date. The docs site publishes an agent-friendly
-index plus clean per-page markdown; this skill wraps both behind one small helper so you pull
-only what a given question needs and keep your context small.
+a remembered answer is often quietly out of date. This skill lets you search the docs and pull
+only the page (or section) a given question needs, keeping your context small.
 
 Run the helper from this skill's directory:
 
@@ -36,11 +34,11 @@ python3 scripts/teleport_docs.py <command>
 
 Escalate only as far as the question needs.
 
-1. **Search the index** — find the right page(s) by their **content**, not just titles.
-   Search reads a pre-built TF-IDF index (`references/search-index.json`) that indexes the
-   full text of every page (~765 pages). It returns titles, URLs, content previews, and scores —
-   all offline, no network call. Lead with the distinctive nouns (product/feature/CLI names),
-   not filler. Falls back to lexical title/description search if the index is missing.
+1. **Search by content** — find the right page(s). Search matches the actual **page content**,
+   not just titles, so a query about a specific config key, CLI flag, or error string finds the
+   page even when its title never mentions that term. Lead with the distinctive nouns
+   (product/feature/CLI names, exact field/flag/error strings), not filler. (If the content
+   index isn't present it transparently falls back to a title/description search.)
    ```
    python3 scripts/teleport_docs.py search "tbot github actions machine id" --limit 8
    ```
@@ -105,18 +103,10 @@ The page endpoints serve the **current major version** (the live site, currently
 user pins an older version, say that you're reading latest; the site also serves versioned
 paths (e.g. `/docs/ver/16.x/...`) if you need to confirm an older release.
 
-## Keeping the index fresh
+## Keeping search fresh
 
-The cached index occasionally drifts as pages are added or moved. If `search` misses something
-you'd expect, refresh it:
-
-```bash
-# Re-download llms.txt only (fast)
-python3 scripts/teleport_docs.py refresh
-
-# Full rebuild: llms.txt + TF-IDF search index (downloads all ~765 pages, ~2-3 min)
-python3 scripts/teleport_docs.py refresh --index
-```
-
-The search index (`references/search-index.json`, ~2-5 MB) is shipped with the skill repo.
-Rebuild it after major doc updates or when results feel stale.
+`fetch` always reads the live page, so page **content** is always current. Only `search`'s
+view of *which pages exist* can drift as docs are added or renamed. If `search` misses a page
+you'd expect, the index can be rebuilt — see
+[`references/maintaining-the-index.md`](references/maintaining-the-index.md) for how it works
+and what a rebuild costs (it makes a lot of network calls).
