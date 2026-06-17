@@ -14,6 +14,7 @@ description: >-
 metadata:
   source: https://goteleport.com/docs/llms.txt
   page_endpoints: "https://goteleport.com/docs/<path>.md (clean markdown, token-counted)"
+  search_index: "references/search-index.json — pre-built TF-IDF index over all page content"
   tracks: "latest major version (the live site; currently v18)"
 ---
 
@@ -35,10 +36,11 @@ python3 scripts/teleport_docs.py <command>
 
 Escalate only as far as the question needs.
 
-1. **Search the index** — find the right page(s). This reads a cached copy of the docs index
-   (`references/llms.txt`, ~765 pages); it returns titles, URLs, and one-line descriptions, no
-   page bodies, so it's cheap. Lead with the distinctive nouns (product/feature/CLI names),
-   not filler.
+1. **Search the index** — find the right page(s) by their **content**, not just titles.
+   Search reads a pre-built TF-IDF index (`references/search-index.json`) that indexes the
+   full text of every page (~765 pages). It returns titles, URLs, content previews, and scores —
+   all offline, no network call. Lead with the distinctive nouns (product/feature/CLI names),
+   not filler. Falls back to lexical title/description search if the index is missing.
    ```
    python3 scripts/teleport_docs.py search "tbot github actions machine id" --limit 8
    ```
@@ -106,8 +108,15 @@ paths (e.g. `/docs/ver/16.x/...`) if you need to confirm an older release.
 ## Keeping the index fresh
 
 The cached index occasionally drifts as pages are added or moved. If `search` misses something
-you'd expect, refresh it (re-downloads `llms.txt` — the whole maintenance story, no reindexing):
+you'd expect, refresh it:
 
-```
+```bash
+# Re-download llms.txt only (fast)
 python3 scripts/teleport_docs.py refresh
+
+# Full rebuild: llms.txt + TF-IDF search index (downloads all ~765 pages, ~2-3 min)
+python3 scripts/teleport_docs.py refresh --index
 ```
+
+The search index (`references/search-index.json`, ~2-5 MB) is shipped with the skill repo.
+Rebuild it after major doc updates or when results feel stale.
