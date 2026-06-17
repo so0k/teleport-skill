@@ -166,25 +166,38 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
             doc_vectors.append(Counter())
             continue
 
-        # Extract substantial text: skip code fences, headings, link-only lines
+        # Extract substantial text. Code blocks ARE indexed: config keys, CLI
+        # flags, file names and error strings inside ``` fences carry the
+        # highest-signal exact tokens this skill is meant to retrieve (a term
+        # that appears only in a YAML/CLI example would otherwise be unfindable).
+        # Code is kept OUT of the human-readable preview, though. Fence detection
+        # handles ``` and ~~~, a language on the opener, and a closer whose run is
+        # >= the opener's (CommonMark) — so Teleport's ```code … ```` pattern and
+        # nested fences don't desync the parser.
         text_lines = []
         preview_lines = []
         in_fence = False
-        fence_marker = ""
+        fence_char = ""
+        fence_len = 0
         for line in md.splitlines():
-            # Match code-fence markers (``` with optional language), track the
-            # opening backtick run length to handle nested/longer fences correctly.
-            fm = re.match(r"^(```+)\s*", line)
+            fm = re.match(r"^([`~]{3,})(.*)$", line)
             if fm:
-                marker = fm.group(1)
+                marker, rest = fm.group(1), fm.group(2).strip()
                 if not in_fence:
                     in_fence = True
-                    fence_marker = marker
-                elif marker == fence_marker:
+                    fence_char = marker[0]
+                    fence_len = len(marker)
+                    continue
+                if marker[0] == fence_char and len(marker) >= fence_len and not rest:
                     in_fence = False
-                    fence_marker = ""
+                    fence_char = ""
+                    fence_len = 0
+                    continue
+                # a fence-looking line *inside* a block (nested/odd) — index as code
+                text_lines.append(line)
                 continue
             if in_fence:
+                text_lines.append(line)  # index code content; do not add to preview
                 continue
             stripped = line.lstrip("#").strip()
             # check original line for heading (before stripping #)
