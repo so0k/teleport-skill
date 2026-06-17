@@ -31,13 +31,14 @@ INDEX_FILE = os.path.join(REFERENCES, "search-index.json")
 DEFAULT_MAX_CHARS = 5000
 
 LINK_RE = re.compile(r"^\-\s*\[(?P<title>[^\]]+)\]\((?P<url>[^)]+)\)\s*:?\s*(?P<desc>.*)$")
-# words we don't want to weight in lexical scoring
-STOP = {
-    "the", "a", "an", "to", "of", "for", "and", "or", "in", "on", "with",
-    "do", "i", "is", "are", "my", "me", "can", "use", "using", "teleport", "set",
-    "up", "get", "what", "when", "where", "which", "guide", "docs", "doc",
-    "how",
-}
+
+# Stop words MUST be identical to the index builder's, or query tokenization
+# won't align with the indexed terms — a divergent set silently drops terms from
+# queries that were indexed (and vice-versa), degrading recall. teleport_index.py
+# is the single source of truth; import it rather than maintaining a second copy.
+if SCRIPT_DIR and SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+from teleport_index import STOP_WORDS as STOP
 
 
 def _http_get(url: str) -> str:
@@ -71,8 +72,11 @@ def load_manifest():
 def _terms(text: str):
     tokens = [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 1]
     if not tokens and text.strip():
-        # Query had content but produced no tokens — likely non-ASCII (the index
-        # is English/ASCII-only).
+        # Query had content but produced no usable tokens. Distinguish the two
+        # causes so the message isn't misleading: all-stop-word/too-short ASCII
+        # queries vs genuinely non-ASCII input (the index is English/ASCII-only).
+        if re.search(r"[a-z0-9]", text.lower()):
+            sys.exit("query has no searchable terms (only stop words or single characters); add a distinctive term")
         sys.exit("no indexable terms in query; the search index is English/ASCII-only")
     return tokens
 
@@ -190,6 +194,9 @@ def _to_md_url(target: str) -> str:
         url = "https://goteleport.com/" + target
     else:
         url = f"{DOCS_BASE}/{target.lstrip('/')}"
+    # Drop any #fragment or ?query before appending .md — the .md endpoint is a
+    # flat file and 404s on '.../tsh#section.md' or '.../tsh?tab=cloud.md'.
+    url = url.split("#", 1)[0].split("?", 1)[0]
     if not url.endswith(".md"):
         url = url.rstrip("/") + ".md"
     return url
