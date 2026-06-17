@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""teleport_index.py — build a searchable TF-IDF index from all Teleport docs pages.
+"""teleport_index.py — build a searchable BM25 index from all Teleport docs pages.
 
 Downloads every page listed in llms.txt via the clean .md endpoints, tokenizes
 them, and saves a sparse index to references/search-index.json. Pure stdlib;
@@ -8,15 +8,16 @@ need to build it — just run `refresh` when the docs drift.
 
 Index format (references/search-index.json):
   {
-    "version": 1,
+    "version": 2,
     "built": "2026-06-16T...",
     "doc_count": 765,
-    "docs": [{"url": "...", "title": "...", "desc": "..."}, ...],
+    "avg_doc_len": 843.2,
+    "docs": [{"url": "...", "title": "...", "desc": "...", "preview": "..."}, ...],
     "index": {"term": {"0": 2.5, "5": 1.3}, ...}
   }
 
 Search (in teleport_docs.py) loads the index, tokenizes the query, and sums
-term weights per document — no model, no embeddings, no network.
+BM25 weights per document — no model, no embeddings, no network.
 """
 
 import json
@@ -136,10 +137,17 @@ def fetch_page_md(url: str, sleep: float = _REQUEST_SLEEP) -> str:
     return "\n".join(lines)
 
 
-# ── TF-IDF index building ───────────────────────────────────────────────────
+# ── BM25 index building ───────────────────────────────────────────────────
+
+# BM25 (Okapi) ranking parameters. k1 controls term-frequency saturation (a term
+# appearing 20× isn't 20× as relevant); b controls document-length normalization
+# (0 = none, 1 = full) so long pages don't dominate purely by size.
+BM25_K1 = 1.2
+BM25_B = 0.75
+
 
 def build_index(entries: list[dict], progress: bool = True) -> dict:
-    """Download all pages, compute TF-IDF, return the index dict.
+    """Download all pages, compute BM25 weights, return the index dict.
 
     Returns a dict ready to serialize as search-index.json.
     """
@@ -166,25 +174,38 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
             doc_vectors.append(Counter())
             continue
 
-        # Extract substantial text: skip code fences, headings, link-only lines
+        # Extract substantial text. Code blocks ARE indexed: config keys, CLI
+        # flags, file names and error strings inside ``` fences carry the
+        # highest-signal exact tokens this skill is meant to retrieve (a term
+        # that appears only in a YAML/CLI example would otherwise be unfindable).
+        # Code is kept OUT of the human-readable preview, though. Fence detection
+        # handles ``` and ~~~, a language on the opener, and a closer whose run is
+        # >= the opener's (CommonMark) — so Teleport's ```code … ```` pattern and
+        # nested fences don't desync the parser.
         text_lines = []
         preview_lines = []
         in_fence = False
-        fence_marker = ""
+        fence_char = ""
+        fence_len = 0
         for line in md.splitlines():
-            # Match code-fence markers (``` with optional language), track the
-            # opening backtick run length to handle nested/longer fences correctly.
-            fm = re.match(r"^(```+)\s*", line)
+            fm = re.match(r"^([`~]{3,})(.*)$", line)
             if fm:
-                marker = fm.group(1)
+                marker, rest = fm.group(1), fm.group(2).strip()
                 if not in_fence:
                     in_fence = True
-                    fence_marker = marker
-                elif marker == fence_marker:
+                    fence_char = marker[0]
+                    fence_len = len(marker)
+                    continue
+                if marker[0] == fence_char and len(marker) >= fence_len and not rest:
                     in_fence = False
-                    fence_marker = ""
+                    fence_char = ""
+                    fence_len = 0
+                    continue
+                # a fence-looking line *inside* a block (nested/odd) — index as code
+                text_lines.append(line)
                 continue
             if in_fence:
+                text_lines.append(line)  # index code content; do not add to preview
                 continue
             stripped = line.lstrip("#").strip()
             # check original line for heading (before stripping #)
@@ -219,34 +240,40 @@ def build_index(entries: list[dict], progress: bool = True) -> dict:
         print(f"  index built from {non_empty}/{total} successfully fetched pages",
               file=sys.stderr)
 
-    # Compute document frequencies
-    N = len(doc_vectors)
+    # Document frequencies and per-doc lengths (BM25 needs both).
     df: Counter = Counter()  # term → number of docs containing it
     for vec in doc_vectors:
         df.update(set(vec.keys()))
+    doc_len = [sum(vec.values()) for vec in doc_vectors]  # total tokens per doc
+    # N excludes failed/empty docs so IDF and the average length aren't skewed
+    # (an empty doc from a failed fetch contributes to neither df nor length).
+    N = non_empty
+    avgdl = (sum(doc_len) / N) if N else 0.0
 
-    # Build sparse index with deterministic ordering
-    # IDF = log((N + 1) / (df + 1)) + 1  (smooth)
-    # TF  = 1 + log(count)               (sublinear)
-    # Weight = TF * IDF, stored per (term, doc_idx)
+    # Build the sparse index with BM25 weights baked in per (term, doc_idx). A
+    # term's BM25 contribution to a doc is independent of the rest of the query,
+    # so the searcher just sums postings. The `b` length-normalization term means
+    # long pages (e.g. the multi-hundred-page Changelog) no longer rank highly
+    # purely because of their size — they must be genuinely term-dense.
     index: dict[str, dict[str, float]] = {}
-
     for term in sorted(df):
         doc_freq = df[term]
-        idf = math.log((N + 1) / (doc_freq + 1)) + 1
+        idf = math.log(1 + (N - doc_freq + 0.5) / (doc_freq + 0.5))
         postings: dict[str, float] = {}
         for doc_idx, vec in enumerate(doc_vectors):
-            count = vec.get(term, 0)
-            if count == 0:
+            f = vec.get(term, 0)
+            if f == 0:
                 continue
-            tf = 1 + math.log(count)
-            postings[str(doc_idx)] = round(tf * idf, 4)
+            dl = doc_len[doc_idx]
+            denom = f + BM25_K1 * (1 - BM25_B + BM25_B * (dl / avgdl if avgdl else 1.0))
+            postings[str(doc_idx)] = round(idf * f * (BM25_K1 + 1) / denom, 4)
         index[term] = postings
 
     return {
-        "version": 1,
+        "version": 2,
         "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "doc_count": non_empty,
+        "avg_doc_len": round(avgdl, 1),
         "docs": docs_meta,
         "index": index,
     }

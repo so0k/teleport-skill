@@ -13,8 +13,8 @@ server — because Teleport already publishes everything an agent needs:
 - **Per-page `.md` twins** — append `.md` to any docs URL (e.g.
   [`/docs/get-started.md`](https://goteleport.com/docs/get-started.md)) for clean, token-counted
   markdown. No HTML scraping, no MDX processing.
-- **Pre-built TF-IDF search index** — `references/search-index.json` indexes the full text of
-  all ~765 pages (~3.6 MB). Search is offline, content-level, and needs no model or network call.
+- **Pre-built BM25 search index** — `references/search-index.json` indexes the full text (prose AND code blocks) of
+  all ~765 pages (~4.0 MB). Search is offline, content-level, and needs no model or network call.
 
 So there's no scrape, no chunking, and no semantic index to maintain — the skill wraps
 Teleport's own endpoints.
@@ -26,7 +26,7 @@ The skill teaches the agent an escalation ladder via one small helper CLI
 
 | Command | Purpose | AWS Docs MCP analogue |
 |---|---|---|
-| `search "<query>"` | TF-IDF content search over pre-built index (offline, previews included) | `search_documentation` |
+| `search "<query>"` | BM25 content search over pre-built index (offline, previews included) | `search_documentation` |
 | `fetch <url> [--max-chars N --start I] [--section H]` | clean markdown for one page, windowed | `read_documentation` |
 | `related <url>` | sibling pages in the same index section | `recommend` |
 | `refresh [--index]` | re-download `llms.txt`; `--index` also rebuilds the search index | — |
@@ -66,6 +66,6 @@ python3 scripts/teleport_docs.py fetch https://goteleport.com/docs/machine-workl
 
 MIT — see [LICENSE](LICENSE). Teleport documentation content is © Gravitational, Inc. and is
 fetched live from goteleport.com. This repo contains the skill wrapper, a cached copy of
-the public docs index (`llms.txt`), and a pre-built TF-IDF search index
+the public docs index (`llms.txt`), and a pre-built BM25 search index
 (`references/search-index.json`) which includes short page-text previews from the live
 docs endpoints.

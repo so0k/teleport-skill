@@ -6,7 +6,7 @@ Backed by Teleport's own published, agent-friendly endpoints:
   - https://goteleport.com/docs/<path>.md — clean markdown for any docs page (token-counted)
 
 Four things the model does, escalating only as far as the question needs:
-  search   TF-IDF content search over a pre-built index (references/search-index.json)
+  search   BM25 content search over a pre-built index (references/search-index.json)
            Falls back to lexical title/description search if the index is missing.
   fetch    pull one page's clean markdown, windowed         (context-bounded)
   related  list sibling pages in the same index section     (fan out to adjacent topics)
@@ -82,7 +82,7 @@ def _terms(text: str):
 
 
 def _load_index():
-    """Load the TF-IDF search index from disk, or return None if missing/corrupt."""
+    """Load the BM25 search index from disk, or return None if missing/corrupt."""
     if not os.path.exists(INDEX_FILE):
         return None
     try:
@@ -93,7 +93,7 @@ def _load_index():
 
 
 def cmd_search(args):
-    """TF-IDF content search with lexical fallback."""
+    """BM25 content search with lexical fallback."""
     idx = _load_index()
 
     if idx:
@@ -103,7 +103,7 @@ def cmd_search(args):
 
 
 def _search_tfidf(args, idx: dict):
-    """Search page content using the pre-built TF-IDF index."""
+    """Search page content using the pre-built BM25 index."""
     q_terms = _terms(args.query)
     if not q_terms:
         sys.exit("empty query after removing stop words; be more specific")
@@ -119,7 +119,7 @@ def _search_tfidf(args, idx: dict):
             scores[doc_idx] = scores.get(doc_idx, 0) + weight
 
     if not scores:
-        # Fall back to lexical if TF-IDF finds nothing — index exists but
+        # Fall back to lexical if BM25 finds nothing — index exists but
         # query terms don't match any indexed content.
         _search_lexical(args, reason="no_term_matches")
         return
@@ -127,7 +127,7 @@ def _search_tfidf(args, idx: dict):
     ranked = sorted(scores.items(), key=lambda x: -x[1])
     displayed = min(len(ranked), args.limit)
     built = idx.get("built", "unknown date")
-    print(f"# {displayed} of {len(ranked)} results for: {args.query}  (TF-IDF content search, index built {built})\n")
+    print(f"# {displayed} of {len(ranked)} results for: {args.query}  (BM25 content search, index built {built})\n")
 
     for _, (doc_idx, score) in enumerate(ranked[: args.limit]):
         doc = docs[doc_idx]
@@ -287,7 +287,7 @@ def cmd_refresh(args):
     print(f"refreshed {MANIFEST}\n{n} pages indexed from {LLMS_URL}")
 
     if args.index:
-        print("\nbuilding TF-IDF search index ...")
+        print("\nbuilding BM25 search index ...")
         import subprocess
         indexer = os.path.join(SCRIPT_DIR, "teleport_index.py")
         result = subprocess.run(
@@ -302,7 +302,7 @@ def main():
     p = argparse.ArgumentParser(description="Search & read the Teleport docs.")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("search", help="TF-IDF content search (lexical fallback if index missing)")
+    s = sub.add_parser("search", help="BM25 content search (lexical fallback if index missing)")
     s.add_argument("query")
     s.add_argument("--limit", type=int, default=10)
     s.set_defaults(func=cmd_search)
@@ -319,7 +319,7 @@ def main():
     r.set_defaults(func=cmd_related)
 
     rf = sub.add_parser("refresh", help="re-download llms.txt; --index to rebuild search index")
-    rf.add_argument("--index", action="store_true", help="also rebuild the TF-IDF search index")
+    rf.add_argument("--index", action="store_true", help="also rebuild the BM25 search index")
     rf.set_defaults(func=cmd_refresh)
 
     args = p.parse_args()
