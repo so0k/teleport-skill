@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 3 · The title-only blind spot</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● <b>●</b> ○ ○ ○ ○ ○ ○ &nbsp;&nbsp;Lesson 3 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>The title-only blind spot</h1>
+<p class="tension">Your search reads one line per page. What if the word you need
+never shows up in that line?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>In <a href="0002-borrow-the-index.html">Lesson 2</a> we got a cheap win: search the
+<code>llms.txt</code> manifest instead of crawling the site. But remember what a manifest
+line actually holds — just a <strong>title</strong> and a <strong>one-line
+description</strong>:</p>
+
+<pre><code>- [PostgreSQL](/docs/.../postgres-self-hosted.md): Enroll a self-hosted PostgreSQL database with Teleport.</code></pre>
+
+<p>Now read a real question a platform engineer asks (this is eval 13 from the test set):</p>
+
+<blockquote>
+"I'm enrolling a self-hosted Postgres database and need it to require client
+certificates. What <code>pg_hba.conf</code> settings and <code>hostssl</code> entry do I
+need?"
+<cite>— eval 13, <code>../../evals/evals.json</code></cite>
+</blockquote>
+
+<p>The right page <em>is</em> that PostgreSQL page. But look: the words that make this
+question specific — <code>pg_hba.conf</code>, <code>hostssl</code>, "client
+certificates" — appear <strong>nowhere</strong> in the title or the description. They
+live deep in the page <strong>body</strong>.</p>
+
+<p>So a search that only reads manifest lines never matches. The perfect page scores
+<strong>zero</strong>. We call that a <em>complete miss</em> — rank 0.</p>
+
+<div class="warn">
+<span class="label">The blind spot</span>
+A title-only search can only find a page by words in its <em>title or one-line
+description</em>. But the most useful questions are full of words that live <em>only in
+the body</em> — error strings, config keys, file names, CLI flags. Exactly the
+identifiers your grounded plan depends on. The search is blind to all of them.
+</div>
+
+<blockquote>
+"search matched only the one-line title+description per page — 'no page bodies, so it's
+cheap … an index lookup, not a content search.' This blind spot wouldn't surface until
+evals."
+<cite>— CORPUS.md, Act A (the latent flaw)</cite>
+</blockquote>
+
+<p>This is sneaky because the cheap version <em>feels</em> fine on easy questions. It
+breaks on exactly the hard, specific ones — and those are the ones you most need
+grounded.</p>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>The fix is plain to say: stop searching only the one-line summary. Search the
+<strong>whole page body</strong>. Index every word in the markdown twin, not just the
+title.</p>
+
+<p>Two names for the two approaches — keep them straight, we use them all course:</p>
+
+<table>
+<tr><th>Approach</th><th>What it indexes</th><th>Finds <code>pg_hba.conf</code>?</th></tr>
+<tr><td><strong>Title-only</strong> (what we have)</td><td>title + one-line description</td><td>No — rank 0</td></tr>
+<tr><td><strong>Full-text / content</strong> (what we want)</td><td>the entire page body</td><td>Yes — rank 1</td></tr>
+</table>
+
+<p>It sounds obvious once said. The catch is cost: now we must download all 765 markdown
+twins, pull out their words, and store that. That's a real index — the thing we happily
+avoided in Lesson 2. We'll build it properly in Lessons 5 and 6. For now, just hold the
+idea: <strong>search the body, not the label.</strong></p>
+
+<div class="roi">
+<span class="label">⏱️ Worth it?</span>
+Before you build that index, ask: how often will this skill be used, and by how many
+agents? A full-text index is real, ongoing work. It only pays off if the blind spot
+actually bites your users often enough to matter. We'll <em>measure</em> exactly that in
+the next lesson — so the decision is grounded too, not a hunch.
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Same question, two indexes. Watch what each one can "see."</p>
+
+<figure>
+<div class="diagram">  query: "pg_hba.conf  hostssl  require client certs"
+
+  <span class="hi">TITLE-ONLY index</span>            <span class="hi2">FULL-TEXT index</span>
+  sees only the label:            sees the whole body:
+  ┌──────────────────────┐        ┌──────────────────────┐
+  │ "PostgreSQL"         │        │ "PostgreSQL" + body: │
+  │ "Enroll a self-      │        │  ...require SSL...   │
+  │  hosted database"    │        │  pg_hba.conf         │
+  │                      │        │  hostssl all ...     │
+  └──────────┬───────────┘        └──────────┬───────────┘
+             │ no shared words               │ words match!
+             ▼                               ▼
+        rank 0  (miss)                  rank 1  (found)</div>
+<figcaption>The query terms live in the body. Only the full-text index can see them.</figcaption>
+</figure>
+
+<p>Here's the part that matters for <em>you</em> as a skill-builder. We just claimed
+"title-only misses, full-text finds." That's a nice story. But how do we <strong>know</strong>
+it's true — and true often enough to be worth the cost of a real index?</p>
+
+<p class="tension">We could eyeball a handful of queries and nod. But eyeballing is
+vibes, not evidence. And a few lucky examples can hide a real pattern. To trust the fix,
+we have to <em>measure</em> it — on many questions, fairly.</p>
+
+<p>That raises a juicy problem: where do we get a pile of fair, <strong>body-only</strong>
+questions — ones whose answer words live only in the page body — without hand-writing
+them one by one? In <a href="0004-evals-sample-the-blind-spot.html">Lesson 4</a> we
+generate them with a workflow, then run the benchmark. (Spoiler from the corpus: the
+score was lopsided.)</p>
+</section>
+
+<!-- INTERACTIVE: spot the body-only query -->
+<div class="quiz">
+<p class="q">Your turn — spot the body-only query.</p>
+<p>The PostgreSQL page is titled <em>"PostgreSQL"</em>, described <em>"Enroll a
+self-hosted PostgreSQL database."</em> Which question would a <strong>title-only</strong>
+search still find, and which is a body-only blind spot? Decide, then check.</p>
+
+<details>
+<summary>A. "How do I enroll a self-hosted PostgreSQL database?"</summary>
+<p class="answer"><strong>Title-only finds it.</strong> The words "enroll", "self-hosted",
+"PostgreSQL" are right there in the title and description. Easy question, easy hit.</p>
+</details>
+
+<details>
+<summary>B. "Which pg_hba.conf hostssl entry requires client certs?"</summary>
+<p class="answer"><strong>Body-only blind spot.</strong> None of
+<code>pg_hba.conf</code> / <code>hostssl</code> / "client certs" appear in the label —
+title-only scores it rank 0, even though it's the same page.</p>
+</details>
+
+<p class="q" style="margin-top:1rem;">Recall check:</p>
+<details>
+<summary>What is a "complete miss" (rank 0)?</summary>
+<p class="answer">When the correct page shares no words with the label the search reads,
+so it never matches — the right answer scores zero.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>See it for yourself (primary source):</strong> Open Teleport's real
+<a href="https://goteleport.com/docs/llms.txt"><code>llms.txt</code></a> and find the
+PostgreSQL line — note it has no <code>pg_hba.conf</code>. Then open that page's
+<code>.md</code> twin and use your browser's find (⌘F) for <code>hostssl</code>: it's
+only in the body. That gap <em>is</em> the blind spot.
+</div>
+
+<p class="ask">💬 Ask your teacher: "show me more body-only evals from the test set," or
+"why not just stuff every page body into the agent's context and skip search?"</p>
+
+<p>New terms (<code>full-text / content search</code>, <code>title-only search</code>,
+<code>body-only query</code>, <code>complete miss / rank 0</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0002-borrow-the-index.html">← Lesson 2 · Borrow the index</a></span>
+<span><a href="0004-evals-sample-the-blind-spot.html">Lesson 4 · Evals that sample the blind spot →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

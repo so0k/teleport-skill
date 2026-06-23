@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a docs Skill · A brown-bag</title>
+<link rel="stylesheet" href="assets/course.css">
+<style>
+  .bar { display:flex; gap:.4rem; align-items:center; margin:1.5rem 0 .5rem; flex-wrap:wrap; }
+  .bar .dot {
+    width:1.6rem; height:1.6rem; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--sans); font-size:.8rem; font-weight:700;
+    border:2px solid var(--rule); color:var(--muted); background:#fff;
+    text-decoration:none;
+  }
+  .bar .dot.done { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .bar .dot.next { border-color:var(--accent); color:var(--accent); }
+  .bar .line { flex:1; height:2px; background:var(--rule); min-width:.4rem; }
+  .bar .line.done { background:var(--accent); }
+  .progress-label { font-family:var(--sans); font-size:.8rem; color:var(--muted); margin-bottom:2rem; }
+  ol.toc { list-style:none; padding:0; counter-reset:lesson; }
+  ol.toc li {
+    border:1px solid var(--rule); border-radius:6px; padding:.8rem 1rem;
+    margin:.6rem 0; display:flex; align-items:baseline; gap:.8rem; background:#fff;
+  }
+  ol.toc li.ready { border-left:4px solid var(--accent); }
+  ol.toc li.soon { opacity:.6; border-left:4px solid var(--rule); }
+  ol.toc .num { font-family:var(--sans); font-weight:700; color:var(--accent); min-width:1.5rem; }
+  ol.toc .soon .num { color:var(--muted); }
+  ol.toc .body { flex:1; }
+  ol.toc .body .t { font-weight:700; font-size:1.02rem; }
+  ol.toc .body .t a { text-decoration:none; color:var(--ink); }
+  ol.toc .body .d { font-size:.88rem; color:#555; margin-top:.15rem; }
+  ol.toc .tag {
+    font-family:var(--sans); font-size:.64rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:.12rem .45rem; border-radius:3px; align-self:center; white-space:nowrap;
+  }
+  ol.toc .tag.ready { background:var(--accent); color:#fff; }
+  ol.toc .tag.soon { background:var(--rule); color:var(--muted); }
+</style>
+</head>
+<body>
+
+<p class="kicker">A brown-bag · for platform engineers</p>
+<h1>Build a docs Skill</h1>
+<p class="tension">Turn a pile of documentation into an agent that plans rollouts you
+can actually <code>apply</code> — and prove it with evals, not vibes.</p>
+
+<!-- PROGRESS BAR -->
+<div class="bar" aria-label="Course progress">
+  <a class="dot done" href="lessons/0001-the-grounding-problem.html">1</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0002-borrow-the-index.html">2</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0003-the-title-blind-spot.html">3</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0004-evals-sample-the-blind-spot.html">4</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0005-pick-the-engine.html">5</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0006-raw-counts-lie.html">6</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0007-index-the-code-blocks.html">7</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0008-reality-check.html">8</a><span class="line done"></span>
+  <a class="dot done" href="lessons/0009-skill-vs-mcp.html">9</a>
+</div>
+<p class="progress-label">✅ All 9 lessons ready · the full brown-bag is live.</p>
+
+<p>We build <strong>one running example</strong>, lesson by lesson: the real
+<code>teleport-docs</code> skill. Each lesson is a 10-minute win and leads into the next.
+Every claim is grounded — in the project's own story
+(<code>../provenance/CORPUS.md</code>) or a trusted source
+(<a href="RESOURCES.md">RESOURCES.md</a>).</p>
+
+<div class="key">
+<span class="label">Two threads run through every lesson</span>
+<strong>Agile iteration</strong> — we don't design the perfect skill up front; we ship a
+minimal version, test it, and improve, so each round sources <em>more accurate data than
+the last</em>. And a <strong>🔴→🟢 / ⏱️ worth-it</strong> habit — every fix gets locked in
+by a test, and we keep asking whether the ancillary work beats just doing the job. The
+honest ending is allowed to be: <em>"this barely beats a web search."</em>
+<br><span style="font-size:.85rem;color:var(--muted)">(A separate idea,
+<em>progressive disclosure / discovery</em>, shows up in Lesson 2 and again at the end:
+the skill surfaces info in small bits — a short index that references out.)</span>
+</div>
+
+<h2>The arc</h2>
+<ol class="toc">
+
+<li class="ready">
+  <span class="num">1</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0001-the-grounding-problem.html">The grounding problem</a></span>
+    <span class="d">Planning rollouts with an agent is high-risk. The AWS Docs MCP pattern: search → fetch. <em>Agent = Model + Harness.</em></span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">2</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0002-borrow-the-index.html">Borrow the publisher's index</a></span>
+    <span class="d">You don't index 765 pages — Teleport already did, via <code>llms.txt</code> + clean <code>.md</code> twins.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">3</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0003-the-title-blind-spot.html">The title-only blind spot</a></span>
+    <span class="d">Searching one line per page misses answers buried in the body. How would you even know?</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">4</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0004-evals-sample-the-blind-spot.html">Evals that sample the blind spot</a></span>
+    <span class="d">Mine "body-only" questions with a workflow; benchmark the search. The 15–0–1 result.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">5</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0005-pick-the-engine.html">Pick the engine: why not embeddings?</a></span>
+    <span class="d">Inkeep and vectors rejected — for shippability. TF-IDF is just arithmetic.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">6</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0006-raw-counts-lie.html">Raw counts lie → BM25</a></span>
+    <span class="d">The Changelog out-ranks the real answer by sheer size. Length normalization (k1, b).</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">7</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0007-index-the-code-blocks.html">Index what people query</a></span>
+    <span class="d"><code>mysqld</code> and <code>pg_hba.conf</code> were invisible — they live in code blocks.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">8</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0008-reality-check.html">Reality check vs. a Google-indexed model</a></span>
+    <span class="d">Ties on correctness, wins on speed/determinism/offline. Be honest about the edge.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+<li class="ready">
+  <span class="num">9</span>
+  <span class="body">
+    <span class="t"><a href="lessons/0009-skill-vs-mcp.html">Step back: skill vs. MCP server</a></span>
+    <span class="d">We copied an MCP — then shipped a skill. Hosting vs. a thin file. When each wins.</span>
+  </span>
+  <span class="tag ready">Ready</span>
+</li>
+
+</ol>
+
+<footer class="lesson-footer">
+<p><strong>Start here:</strong> <a href="lessons/0001-the-grounding-problem.html">Lesson 1 · The grounding problem →</a></p>
+<p class="ask">💬 This is a guided course — ask your teacher anything that's unclear as you go.</p>
+<p style="font-size:.85rem;color:var(--muted);">Reference: <a href="reference/glossary.html">glossary</a> · <a href="RESOURCES.md">resources</a> · <a href="MISSION.md">mission</a></p>
+</footer>
+
+</body>
+</html>

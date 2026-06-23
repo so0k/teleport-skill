@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 6 · Raw counts lie</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● ● ● <b>●</b> ○ ○ ○ &nbsp;&nbsp;Lesson 6 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Raw counts lie</h1>
+<p class="tension">Your search works. So why does a giant changelog keep beating the
+page you actually need?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>We shipped TF-IDF in <a href="0005-pick-the-engine.html">Lesson 5</a>. It passes the
+body-only evals. Ship it, done — right?</p>
+
+<p>Then someone searches <code>machine id tbot</code>. The right answer is the focused
+<code>tbot</code> reference page. But look what ranks near the top: the
+<strong>Teleport Changelog</strong> — a single, enormous page that lists every change in
+every release. It is almost never the page you want. Yet it keeps muscling in above the
+pages that are.</p>
+
+<p>Why? Because our score is <code>weight = TF × IDF</code>, summed over the query's
+words — and <strong>a huge page contains every word many times</strong>. The Changelog
+has 2,891 terms. Of course it racks up a big total. It wins by <em>size</em>, not by
+relevance.</p>
+
+<blockquote>
+"the multi-hundred-page <strong>Changelog (2,891 terms) outranks the focused
+<code>tbot</code> reference</strong> for <code>machine id tbot</code>."
+<cite>— CORPUS.md, Act E (the review)</cite>
+</blockquote>
+
+<p>Here is the twist that makes this the most important lesson in the course. The agent
+that built TF-IDF <strong>knew</strong> about this risk. It even watched the Changelog
+rank high and talked itself into it:</p>
+<blockquote>
+"The changelog shows up a lot (it's a very long page with many terms), but the weights
+naturally push the targeted pages to the top."
+<cite>— CORPUS.md, Act D (the agent, eyeballing the output)</cite>
+</blockquote>
+
+<p>A capable agent made a reasonable call and <em>eyeballed the result as fine.</em>
+It wasn't. That's the lesson: a good guess is still a guess.</p>
+
+<div class="note">
+<span class="label">Eyeballs aren't evals</span>
+The flaw wasn't caught by a smarter model. It was caught by a <strong>measurement</strong>
+— running the query and reading the ranks. Frequency is not relevance, and the only way to
+know your score is fooled is to score it and look.
+</div>
+</section>
+
+<!-- YOUR TURN: propose the fix before the reveal -->
+<div class="quiz">
+<p class="q">Your turn — propose the fix (before you read on).</p>
+<p>A page wins because it's long: every word appears many times, so its total is bloated.
+What would <em>you</em> change about the score to stop big pages from dominating?</p>
+<details>
+<summary>Reveal the idea</summary>
+<p class="answer">Two fixes, and you want both. <strong>(1) Stop rewarding repetition
+without limit</strong> — the 20th time a word appears shouldn't count as much as the
+1st. <strong>(2) Divide by page length</strong> — judge a word's <em>density</em>, not
+its raw count, so a long page gets no free boost. Together, those two ideas <em>are</em>
+BM25.</p>
+</details>
+</div>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>The fix is a small upgrade to TF-IDF called <strong>BM25</strong>. Same family, still
+just arithmetic — but it adds <strong>length normalization</strong>. It has two knobs:</p>
+
+<ul>
+<li><strong><code>k1</code> — saturation.</strong> The more a word repeats, the less each
+extra hit adds. A word appearing 20 times isn't 20× as relevant. (We use
+<code>k1 = 1.2</code>.)</li>
+<li><strong><code>b</code> — length normalization.</strong> Divide a word's score by how
+long the page is compared to the average page. A big page no longer wins just for being
+big. (We use <code>b = 0.75</code>.)</li>
+</ul>
+
+<p>That second knob is the whole cure for the Changelog. Its size stops paying.</p>
+
+<div class="key">
+<span class="label">Frequency ≠ density ≠ relevance</span>
+Raw counts reward <em>length</em>. BM25 asks the better question: how <em>dense</em> is
+this word here, with diminishing returns for repetition? That's much closer to what
+"relevant" actually means.
+</div>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Here's the score, with each piece labeled. You don't need to compute it — just see
+what <code>k1</code> and <code>b</code> do:</p>
+
+<pre><code>            IDF  ×  TF × (k1 + 1)
+score =  ─────────────────────────────────────
+         TF + k1 × (1 − b + b × doc_len / avg_doc_len)
+                                  └──────────────────┘
+                          this is the new part: page length ÷ average
+                          long page → bigger denominator → lower score</code></pre>
+
+<p>And the payoff, same query, before and after:</p>
+<figure>
+<div class="diagram">  query: "machine id tbot"
+
+  <span class="hi">RAW TF×IDF</span>  (no length norm)        <span class="hi2">BM25</span>  (k1 = 1.2,  b = 0.75)
+  ─────────────────────────────        ─────────────────────────────
+  Deploy tbot ............ 27.7         top 4 = all Machine /
+  Getting Started ........ 33.9           Workload Identity pages
+  Changelog .............. 38.1  ◀       Changelog ......... gone
+  (long page wins by size)              (size no longer pays)</div>
+<figcaption>Length normalization dethrones the Changelog; the focused pages rise to the top.</figcaption>
+</figure>
+
+<blockquote>
+"for <code>machine id tbot</code> the top 4 are now all Machine/Workload Identity pages;
+<strong>the Changelog is gone from the top.</strong>"
+<cite>— CORPUS.md, Act G (BM25 lands)</cite>
+</blockquote>
+
+<p>One more thing, and it's the reason this costs nothing extra: we compute the BM25
+weights <strong>at build time</strong> and bake them into the index (it just grows one
+number, the average page length). The shipped skill still does only lookups and addition
+— no new work at query time. Same shippable file, smarter ranking.</p>
+
+<div class="redgreen">
+  <div class="rg-head">🔴 → 🟢 &nbsp; The regression we locked in</div>
+  <div class="rg-body">
+    <p><span class="red">Red:</span> raw <code>TF × IDF</code> let the 2,891-term
+    Changelog outrank the focused <code>tbot</code> page — measured live (for
+    <code>tbot github actions deploy</code> the Changelog hit #2 at 38.1, beating "Deploy
+    tbot" at 27.7).</p>
+    <p><span class="green">Green:</span> BM25 (<code>k1=1.2, b=0.75</code>) → top results
+    all become Machine/Workload Identity pages, Changelog gone. The body-only suite
+    (evals 9–13) stays in place to confirm the ranking holds after the change.</p>
+  </div>
+</div>
+
+<p>That's <em>Agile iteration</em> again: title → body → <strong>ranked by density, not
+size.</strong> Each short round — built, tested, improved — makes the data the agent
+grounds on more accurate.</p>
+
+<p class="tension">But now try searching for <code>mysqld</code>, or
+<code>pg_hba.conf</code>. The page you need exists… and the index can't find it at all.
+Not ranked low — <em>completely absent</em>. What did we forget to index?</p>
+<p>That's <a href="0007-index-the-code-blocks.html">Lesson 7</a>.</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. Why did the Changelog outrank the right page under raw TF × IDF?</summary>
+<p class="answer">It's huge — every word appears many times, so its summed score is bloated.
+It won by length, not relevance. Frequency ≠ relevance.</p>
+</details>
+
+<details>
+<summary>2. What do BM25's two knobs, k1 and b, each do?</summary>
+<p class="answer">k1 saturates repetition (the 20th hit adds little); b normalizes by page
+length (a long page gets no free boost). b is what fixes the Changelog.</p>
+</details>
+
+<details>
+<summary>3. Why was the flaw caught — and what's the lesson?</summary>
+<p class="answer">By a measurement (running the query, reading the ranks), not a smarter
+model. Eyeballs aren't evals — a capable agent's reasonable guess was still wrong.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> Elastic's
+<a href="https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-its-variables">Practical
+BM25 — the algorithm and its variables</a> for a plain-English tour of <code>k1</code> and
+<code>b</code>. For the formal version, the canonical reference is Robertson &amp; Zaragoza,
+<a href="https://www.staff.city.ac.uk/~sbrp622/papers/foundations_bm25_review.pdf">The
+Probabilistic Relevance Framework: BM25 and Beyond</a>.
+</div>
+
+<p class="ask">💬 Ask your teacher: "show me k1 and b changing a real ranking," or "why
+0.75 for b — is that tunable for our docs?"</p>
+
+<p>New terms (<code>BM25</code>, <code>length normalization</code>, <code>k1 (saturation)</code>,
+<code>b</code>, <code>density vs frequency</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0005-pick-the-engine.html">← Lesson 5 · Pick the engine</a></span>
+<span><a href="0007-index-the-code-blocks.html">Lesson 7 · Index the code blocks →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

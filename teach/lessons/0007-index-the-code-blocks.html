@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 7 · Index the code blocks</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● ● ● ● <b>●</b> ○ ○ &nbsp;&nbsp;Lesson 7 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Index the code blocks</h1>
+<p class="tension">The page exists. The word is right there on it. So why does search
+return nothing at all?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>We now search the whole body (Lesson 3) and rank it well with BM25 (Lesson 6). So
+search <code>mysqld</code> — a setting on the self-hosted MySQL page. The result isn't
+ranked low. It's <strong>not there at all</strong>. The word is absent from the index
+entirely.</p>
+
+<blockquote>
+"<code>mysqld</code> (in a config block on the self-hosted MySQL page) was
+<strong>absent from the index entirely</strong>."
+<cite>— CORPUS.md, Act H</cite>
+</blockquote>
+
+<p>Why? Because when we built the index, we skipped everything inside code fences — the
+``` blocks. We treated code as "not real prose" and threw it away. It felt tidy.</p>
+
+<p>But stop and think about <em>what kind of words</em> live in code blocks:
+<code>mysqld</code>, <code>pg_hba.conf</code>, <code>hostssl</code>, CLI flags, error
+strings, file names. Those are <strong>exactly the identifiers</strong> a platform
+engineer searches for — and exactly the body-only questions we promised to win back in
+Lesson 4.</p>
+
+<div class="warn">
+<span class="label">We made our own feature blind</span>
+The skill's whole value is finding exact identifiers. And identifiers live
+disproportionately <em>in code blocks</em>. By dropping fenced content, we built a content
+search that can't see the most content-specific words on the page. The cleanup quietly
+broke the core promise.
+</div>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>The fix is direct: <strong>index the code too.</strong> Pull the words inside the
+``` fences into the page's searchable text, so <code>mysqld</code> becomes findable.</p>
+
+<p>But with one careful twist. There are two different outputs from a page, and they have
+different jobs:</p>
+<ul>
+<li><strong>The search text</strong> — every word, including code, so search can match
+identifiers. Machines read this.</li>
+<li><strong>The preview snippet</strong> — the short (~500-char) human-readable summary
+shown next to a result. People read this. Dumping raw config into it would make it ugly
+and hard to scan.</li>
+</ul>
+
+<p>So we tokenize code <em>into the search text</em>, but keep it <em>out of the
+preview</em>. Search gets sharper; the preview stays clean. We also harden how we detect
+fences, so no block slips through.</p>
+
+<div class="roi">
+<span class="label">⏱️ Worth it?</span>
+Easily. This is a small, build-time change that directly serves the skill's <em>core</em>
+job — finding exact identifiers. High value, low cost. This is the kind of ancillary work
+that clearly pays for itself.
+</div>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Take the self-hosted MySQL page. Its body has a config block:</p>
+
+<pre><code>```
+[mysqld]
+require_secure_transport = ON
+ssl-ca = /etc/teleport/ca.pem
+```</code></pre>
+
+<p>Watch what happens to that block, before and after the fix:</p>
+<figure>
+<div class="diagram">  <span class="hi">BEFORE</span>  (code fences dropped)        <span class="hi2">AFTER</span>  (code tokenized into search text)
+  ──────────────────────────────       ──────────────────────────────
+  search "mysqld"   → nothing          search "mysqld"   → page found, ranked
+  in_index = False                     in_index = True
+                                       (hostssl, tbot, spiffe too)
+
+  preview snippet: clean prose         preview snippet: STILL clean prose
+                                       (code stays out of the preview)</div>
+<figcaption>Code words join the search text; the human preview is left untouched.</figcaption>
+</figure>
+
+<blockquote>
+"Fix verified: <code>mysqld</code>, <code>hostssl</code>, <code>tbot</code>,
+<code>spiffe</code> all <code>in_index=True</code> … Index grew
+<strong>15.5k → 19.8k terms</strong>."
+<cite>— CORPUS.md, Act H</cite>
+</blockquote>
+
+<p>That's about 4,300 new searchable terms — over a quarter more — and they are the
+high-value ones. The cost? Still zero at query time: we tokenize at build time, the
+shipped skill just has a richer index.</p>
+
+<div class="redgreen">
+  <div class="rg-head">🔴 → 🟢 &nbsp; The regression we locked in</div>
+  <div class="rg-body">
+    <p><span class="red">Red:</span> code-fence content was dropped, so
+    <code>mysqld</code> (and friends) were absent from the index — searching them found
+    <em>nothing</em>.</p>
+    <p><span class="green">Green:</span> code is tokenized into the search text
+    (<code>in_index = True</code>; 15.5k → 19.8k terms), kept out of the preview. The
+    body-only evals that depend on code identifiers — <code>pg_hba.conf</code>,
+    <code>hostssl</code> (eval 13) — now hit reliably.</p>
+  </div>
+</div>
+
+<p>Another short round of <em>Agile iteration</em>: we probed the index, found a gap,
+fixed it, and locked it with an eval. Notice the pattern across Lessons 3–7 — every
+improvement came from <strong>testing the thing, not admiring it.</strong></p>
+
+<p class="tension">Our search is now genuinely good: body, BM25, code blocks, all guarded
+by evals. So it's time for the question we've been avoiding. A plain model with
+<em>web search</em> can read these same public docs through Google. Is our skill actually
+<strong>better</strong> — or did we just build a slower Google?</p>
+<p>That's the reality check: <a href="0008-reality-check.html">Lesson 8</a>.</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. Why was <code>mysqld</code> missing from the index entirely?</summary>
+<p class="answer">The indexer dropped everything inside code fences, and
+<code>mysqld</code> only appears in a config block — so it was never indexed.</p>
+</details>
+
+<details>
+<summary>2. Why do code identifiers matter so much for this skill?</summary>
+<p class="answer">The skill's core value is finding exact identifiers (config keys, flags,
+file names, errors) — and those live disproportionately in code blocks.</p>
+</details>
+
+<details>
+<summary>3. Why keep code out of the preview snippet but in the search text?</summary>
+<p class="answer">Search needs every word to match identifiers; the human preview needs to
+stay short and readable. Two outputs, two jobs.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>See it for yourself (primary source):</strong> open the self-hosted Postgres or
+MySQL enrollment page's <code>.md</code> twin on
+<a href="https://goteleport.com/docs/llms.txt"><code>goteleport.com/docs</code></a> and
+note the config keys live inside ``` fences. Those are the words a content search must
+index to be useful. (Background on the project step: CORPUS.md Act H / PR #8.)
+</div>
+
+<p class="ask">💬 Ask your teacher: "what else hides in code we might miss (YAML keys,
+JSON paths)?" or "how would I verify a term is really in_index?"</p>
+
+<p>New terms (<code>code fence</code>, <code>tokenize</code>, <code>preview snippet</code>,
+<code>identifier</code>) are in the <a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0006-raw-counts-lie.html">← Lesson 6 · Raw counts lie</a></span>
+<span><a href="0008-reality-check.html">Lesson 8 · The reality check →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

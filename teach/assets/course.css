@@ -1,0 +1,280 @@
+/* course.css — shared stylesheet for the "Build a docs Skill" brown-bag.
+   Tufte-inspired: generous margins, readable serif, restrained color.
+   Print-friendly: lessons double as hand-outs. Linked by every lesson. */
+
+:root {
+  --ink:      #1a1a1a;
+  --paper:    #fdfcf9;
+  --muted:    #6b6b6b;
+  --rule:     #e3e0d8;
+  --accent:   #9a2515;   /* teleport-ish brick red, used sparingly */
+  --accent-2: #1f5673;   /* deep teal for "solution" beats */
+  --good:     #2e6e3f;
+  --bad:      #9a2515;
+  --code-bg:  #f4f2ec;
+  --maxw:     46rem;
+  --serif:    Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --sans:     "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono:     "SF Mono", "Menlo", "Consolas", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 18px; }
+
+body {
+  font-family: var(--serif);
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.55;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 6rem;
+  max-width: var(--maxw);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Course furniture --- */
+.kicker {
+  font-family: var(--sans);
+  font-size: .72rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 .4rem;
+}
+h1 {
+  font-size: 2.1rem;
+  line-height: 1.12;
+  margin: 0 0 1.2rem;
+  font-weight: 700;
+}
+h2 {
+  font-family: var(--sans);
+  font-size: 1.15rem;
+  letter-spacing: .01em;
+  margin: 2.4rem 0 .6rem;
+  padding-top: .3rem;
+}
+h3 { font-size: 1.05rem; margin: 1.6rem 0 .4rem; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent-2); text-underline-offset: 2px; }
+
+/* --- The Why/What/How beat markers --- */
+.beat {
+  font-family: var(--sans);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 3px;
+  margin-bottom: .5rem;
+}
+.beat.why  { color: #fff; background: var(--accent); }
+.beat.what { color: #fff; background: var(--accent-2); }
+.beat.how  { color: #fff; background: #4a4a4a; }
+
+section.beatblock { margin: 2rem 0; }
+
+/* --- Pull / tension boxes --- */
+.tension {
+  font-size: 1.18rem;
+  font-style: italic;
+  color: var(--accent-2);
+  border-left: 3px solid var(--accent-2);
+  padding: .2rem 0 .2rem 1.1rem;
+  margin: 1.6rem 0;
+}
+
+/* --- Quotes from the corpus (load-bearing evidence) --- */
+blockquote {
+  margin: 1.2rem 0;
+  padding: .6rem 1rem;
+  background: #faf7ef;
+  border-left: 3px solid var(--rule);
+  font-size: .94rem;
+  color: #333;
+}
+blockquote cite {
+  display: block;
+  font-style: normal;
+  font-size: .78rem;
+  color: var(--muted);
+  margin-top: .4rem;
+  font-family: var(--sans);
+}
+
+/* --- Code & identifiers --- */
+code {
+  font-family: var(--mono);
+  font-size: .85em;
+  background: var(--code-bg);
+  padding: .08em .35em;
+  border-radius: 3px;
+}
+pre {
+  font-family: var(--mono);
+  font-size: .82rem;
+  line-height: 1.45;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: .9rem 1rem;
+  overflow-x: auto;
+  margin: 1.2rem 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+/* --- Callouts --- */
+.note, .warn, .key {
+  border-radius: 5px;
+  padding: .8rem 1rem;
+  margin: 1.4rem 0;
+  font-size: .92rem;
+}
+.note { background: #eef4f7; border: 1px solid #cfe0e8; }
+.warn { background: #fbf0ee; border: 1px solid #e8ccc6; }
+.key  { background: #eef6f0; border: 1px solid #cfe6d6; }
+.note .label, .warn .label, .key .label {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: .72rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: .3rem;
+}
+.note .label { color: var(--accent-2); }
+.warn .label { color: var(--bad); }
+.key  .label { color: var(--good); }
+
+/* --- ASCII / progressive diagrams --- */
+.diagram {
+  font-family: var(--mono);
+  font-size: .78rem;
+  line-height: 1.35;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 1rem 1.2rem;
+  margin: 1.4rem 0;
+  white-space: pre;
+  overflow-x: auto;
+  color: #2a2a2a;
+}
+.diagram .hi { color: var(--accent); font-weight: 700; }
+.diagram .hi2 { color: var(--accent-2); font-weight: 700; }
+figcaption {
+  font-family: var(--sans);
+  font-size: .76rem;
+  color: var(--muted);
+  margin-top: .4rem;
+  text-align: center;
+}
+
+/* --- Red → Green: the regression we locked in (recurring from Lesson 4) --- */
+.redgreen {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 1.8rem 0;
+}
+.redgreen .rg-head {
+  font-family: var(--sans);
+  font-weight: 700; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+  padding: .5rem .9rem;
+  background: linear-gradient(90deg, var(--bad) 0%, var(--bad) 50%, var(--good) 50%, var(--good) 100%);
+  color: #fff;
+}
+.redgreen .rg-body { padding: .7rem .95rem; font-size: .92rem; background: #fff; }
+.redgreen .rg-body p { margin: .25rem 0; }
+.redgreen .red   { color: var(--bad);  font-weight: 700; }
+.redgreen .green { color: var(--good); font-weight: 700; }
+
+/* --- "Worth it?" ROI caveat (recurring) --- */
+.roi {
+  background: #fbf7ec;
+  border: 1px solid #e8dcc0;
+  border-left: 4px solid #c98a1a;
+  border-radius: 5px;
+  padding: .8rem 1rem;
+  margin: 1.5rem 0;
+  font-size: .92rem;
+}
+.roi .label {
+  font-family: var(--sans);
+  font-weight: 700; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+  display: block; margin-bottom: .3rem; color: #9a6a12;
+}
+
+/* --- Tables --- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .88rem;
+  margin: 1.4rem 0;
+}
+th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--sans); font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+/* --- Self-check / retrieval practice --- */
+.quiz {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin: 1.6rem 0;
+  background: #fff;
+}
+.quiz .q { font-weight: 700; margin-bottom: .6rem; }
+.quiz details { margin: .3rem 0; }
+.quiz summary {
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: .9rem;
+  padding: .35rem 0;
+}
+.quiz .answer {
+  font-size: .9rem;
+  color: #333;
+  padding: .4rem 0 .2rem 1rem;
+  border-left: 2px solid var(--good);
+}
+
+/* --- Footer: next steps, source, ask-your-teacher --- */
+.lesson-footer {
+  margin-top: 3.5rem;
+  padding-top: 1.2rem;
+  border-top: 2px solid var(--rule);
+  font-size: .9rem;
+}
+.lesson-footer .source {
+  background: #eef4f7;
+  border-radius: 5px;
+  padding: .7rem 1rem;
+  margin-bottom: 1rem;
+}
+.lesson-footer .ask {
+  font-style: italic;
+  color: var(--accent-2);
+}
+.nav { display: flex; justify-content: space-between; font-family: var(--sans); font-size: .85rem; margin-top: 1.2rem; }
+
+/* --- Progress dots (where am I in the course) --- */
+.progress {
+  font-family: var(--sans);
+  font-size: .75rem;
+  color: var(--muted);
+  letter-spacing: .2em;
+  margin-bottom: 1.5rem;
+}
+.progress b { color: var(--accent); }
+
+@media print {
+  body { padding: 0; max-width: 100%; font-size: 11pt; }
+  .quiz details[open] summary { display: none; }
+  details { open: true; }
+  a { color: var(--ink); text-decoration: none; }
+  .lesson-footer .ask { display: block; }
+}

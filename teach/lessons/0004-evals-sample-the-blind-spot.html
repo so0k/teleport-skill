@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 4 · Evals that sample the blind spot</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● <b>●</b> ○ ○ ○ ○ ○ &nbsp;&nbsp;Lesson 4 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Evals that sample the blind spot</h1>
+<p class="tension">"Full-text search is better." Says who? Prove it — without cheating.</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>In <a href="0003-the-title-blind-spot.html">Lesson 3</a> we made a confident claim:
+full-text search beats title-only, because the good words hide in the page body. It
+sounds right. But "sounds right" is exactly what got us into trouble in Lesson 1.</p>
+
+<p>So we need proof. And proof has two traps:</p>
+
+<ul>
+<li><strong>Too few questions.</strong> Three lucky examples can hide the real pattern —
+in either direction.</li>
+<li><strong>Cheating, even by accident.</strong> If <em>we</em> hand-pick the questions,
+we'll quietly choose ones we already know full-text wins. The test must not be rigged by
+the person who wants it to pass.</li>
+</ul>
+
+<p>What we want is a pile of <strong>fair, hard, body-only questions</strong> — many of
+them — that nobody cherry-picked. Writing 50 of those by hand is slow <em>and</em>
+biased. Dead end?</p>
+
+<div class="roi">
+<span class="label">⏱️ Worth it?</span>
+Measuring is ancillary work — it's not "the actual work." So be honest: it's only worth
+it if the skill will be reused enough that shipping a <em>worse</em> search would cost
+more than the test costs to build. For a one-off, skip it. For a skill many agents lean
+on, a benchmark is the cheapest insurance you can buy.
+</div>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>Two moves. First we <em>generate</em> the questions fairly; then we <em>score</em>
+both engines on them.</p>
+
+<p><strong>1. Let a workflow build the test set.</strong> Don't write questions from your
+head. Read the actual page bodies and let the data pick the questions:</p>
+<ol>
+<li>Take a page. List the distinctive words in its <strong>body</strong>.</li>
+<li>Throw away any that also appear in its <strong>title or description</strong>.</li>
+<li>What's left is <em>body-only by construction</em>. Build a question from those words,
+and record which page is the right answer.</li>
+</ol>
+<p>Because step 2 removes every title word, you <em>cannot</em> accidentally write a
+question title-only could win. The fairness is baked in by the method, not by your good
+intentions.</p>
+
+<p><strong>2. Run the benchmark.</strong> For each question, ask both engines: did you
+rank the correct page #1? Count the wins. Now "better" is a number, not an opinion.</p>
+
+<div class="note">
+<span class="label">Why a <em>workflow</em>, not a prompt</span>
+This sampling is repeatable, fans out over hundreds of pages, and removes the human's
+bias. That's the whole point of doing it as a workflow: the machine produces fair, hard
+questions at a scale and neutrality you can't match by hand.
+</div>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Here's the pipeline, end to end:</p>
+
+<figure>
+<div class="diagram">  every page ─▶ body words ─▶ drop title/description words ─▶ <span class="hi2">body-only terms</span>
+                                                                  │
+                                          build a question using them, note the right page
+                                                                  │
+                                                                  ▼
+                              ┌────────── benchmark ──────────┐
+   for each question  ─▶      │  title-only engine: rank?     │  ─▶  count wins
+                              │  full-text  engine: rank?     │
+                              └───────────────────────────────┘</div>
+<figcaption>The sampler guarantees body-only questions; the benchmark turns "better" into a score.</figcaption>
+</figure>
+
+<p>What does one generated question look like? Exactly like the real test set. Here are
+two, straight from <code>evals.json</code> — note the discriminating words live only in
+the body:</p>
+
+<pre><code>{ "id": 9,
+  "prompt": "How do I find the EKPub hash for a TPM join token so my bot can join?",
+  "expected_output": "...EKPub, EKCert, `tbot tpm identify` appear ONLY in the page
+                      BODY... title-only search misses it (rank 0); full-text ranks #1." }
+
+{ "id": 13,
+  "prompt": "...require client certs for self-hosted Postgres — pg_hba.conf / hostssl?",
+  "expected_output": "...pg_hba.conf, hostssl are body-only; title-only ranks 0,
+                      full-text ranks #1." }</code></pre>
+
+<p>Now the part with tension. Before you read the result — <strong>guess</strong>. Over
+16 of these body-only questions, how badly does title-only lose?</p>
+
+<details class="quiz" style="margin:1rem 0;">
+<summary><strong>Reveal the benchmark</strong> (guess first: how many did each engine win?)</summary>
+<p class="answer" style="margin-top:.6rem;">
+<strong>Full-text 15 — title-only 0 — both missed 1.</strong> And in <strong>9</strong>
+of the 16, title-only was a <em>complete miss</em> (rank 0) that full-text caught at rank
+1 — e.g. <code>EKPub hash for TPM join token</code>, <code>generation mismatch / locked
+renewable cert</code>, <code>pg_hba.conf hostssl</code>. The blind spot wasn't a few
+unlucky cases. It was the rule.</p>
+</details>
+
+<blockquote>
+"on 16 body-only queries, TF-IDF won <strong>15–0–1</strong> … with <strong>9</strong>
+queries where lexical had complete misses (rank 0) that TF-IDF caught at rank 1."
+<cite>— CORPUS.md, Act E (the review benchmark)</cite>
+</blockquote>
+
+<p>This is the moment the claim stops being a story and becomes evidence. And here's the
+discipline that makes it stick: we don't delete these questions after they pass. We
+<strong>keep them forever</strong>, as a wall against the next change. In fact, the
+body-only suite was written <em>before</em> the better engine even existed — a failing
+test on purpose, waiting for the fix to turn it green.</p>
+
+<div class="redgreen">
+  <div class="rg-head">🔴 → 🟢 &nbsp; The regression we locked in</div>
+  <div class="rg-body">
+    <p><span class="red">Red:</span> title-only search missed body-only questions —
+    <strong>0 of 16</strong> wins, 9 complete misses (rank 0).</p>
+    <p><span class="green">Green:</span> evals 9–13 assert the right page ranks #1 on
+    those questions — added <em>before</em> the fix, kept in the suite to guard every
+    future change. ("Use these to confirm the relevance improvement holds.")</p>
+  </div>
+</div>
+
+<p>Meet the idea by name. We don't design the perfect skill up front. We ship a minimal
+version, put it to the test, and improve — in short rounds. That's plain
+<strong>Agile iteration</strong>: borrow the index, then search the body, then (next)
+rank it well, then index code too. Each short loop sources more accurate data than the
+last, and every fix is locked by a test (red → green).</p>
+
+<p class="tension">We've proven full-text wins. But Lesson 3 warned that building a
+full-text index has a cost. So what do we actually build — and how do we ship it without
+a server or a giant model?</p>
+<p>That's <a href="0005-pick-the-engine.html">Lesson 5</a>: pick the engine. (Spoiler:
+the fancy option loses — on shippability.)</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. Why generate the test questions with a workflow instead of by hand?</summary>
+<p class="answer">It removes human bias (you can't cherry-pick winners) and scales over
+hundreds of pages — fair, hard, body-only questions by construction.</p>
+</details>
+
+<details>
+<summary>2. What one step makes a question "body-only by construction"?</summary>
+<p class="answer">Dropping every word that also appears in the page's title or
+description — so only body words remain to build the question from.</p>
+</details>
+
+<details>
+<summary>3. What is the red → green discipline here?</summary>
+<p class="answer">Write the failing test first (title-only misses), then build the fix to
+turn it green — and keep the test forever as a regression bar against future changes.</p>
+</details>
+
+<details>
+<summary>4. When is building this benchmark NOT worth it?</summary>
+<p class="answer">For a one-off skill few will reuse. The effort only pays off when many
+agents depend on the skill and a worse search would cost more than the test does.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> the IR textbook chapter
+<a href="https://nlp.stanford.edu/IR-book/html/htmledition/evaluation-in-information-retrieval-1.html">Evaluation
+in information retrieval</a> (Manning, Raghavan, Schütze) — how to build a test collection
+and read precision/recall. Then skim the real
+<a href="../../evals/evals.json"><code>evals.json</code></a> and find ids 9–13: every one
+is a fossilized failure.
+</div>
+
+<p class="ask">💬 Ask your teacher: "walk me through the sampling workflow as real code,"
+or "what's the difference between this benchmark and the reality-check in Lesson 8?"</p>
+
+<p>New terms (<code>eval</code>, <code>regression bar</code>, <code>benchmark</code>,
+<code>red → green</code>, <code>progressive discovery</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0003-the-title-blind-spot.html">← Lesson 3 · The blind spot</a></span>
+<span><a href="0005-pick-the-engine.html">Lesson 5 · Pick the engine →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

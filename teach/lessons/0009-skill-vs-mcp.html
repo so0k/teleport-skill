@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 9 · Skill vs MCP server</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● ● ● ● ● ● <b>●</b> &nbsp;&nbsp;Lesson 9 of 9 · the finale</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Skill vs MCP server</h1>
+<p class="tension">In Lesson 1 we copied an MCP. Then we shipped a skill instead. Now you
+know enough to say <em>why</em> — and when you'd choose the other.</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>This is where the whole course bends back on itself. We opened by copying the
+<strong>AWS Docs MCP</strong> pattern — search + fetch. But we never shipped an MCP
+server. We shipped a <strong>skill</strong>: a thin file. Why the switch? And when would
+the MCP have been the right call?</p>
+
+<p>You've now <em>felt</em> the answer, lesson by lesson. Lesson 5: embeddings rank by
+meaning but need a model at query time. Lesson 8: for public docs the skill only ties web
+search. Both point at the same fork in the road. Let's name it clearly so you can make
+this call for your own docs.</p>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>The two shapes are the same idea — grounded search + fetch — packaged completely
+differently:</p>
+
+<ul>
+<li><strong>A skill is a file other agents download.</strong> It runs on the client. No
+server, no keys, no model to load. Dead simple to ship and to trust. The price: it can
+only do what fits in a static file — lexical/BM25 ranking, not embeddings.</li>
+<li><strong>An MCP server is software you run.</strong> You host it, or the user starts
+it locally with something like <code>uvx</code>. It has <em>no capability ceiling</em>:
+embeddings, a vector database (like Chroma), live queries, fancy indexing — all on the
+server, keeping the client "dumb." The price: someone must host it, secure it, and keep
+it up.</li>
+</ul>
+
+<div class="key">
+<span class="label">The trade in one line</span>
+<strong>Skill = thin to ship, zero ops, capped capability.</strong>
+<strong>MCP = richer capability, real ops cost.</strong>
+You are trading <em>"easy to distribute"</em> against <em>"can do anything."</em>
+</div>
+
+<p>That's exactly why embeddings (Lesson 5) live on the MCP side: they need a model at
+query time, so they can't ride inside a static file — they need the server an MCP gives
+you.</p>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Use this table to make the call for any corpus:</p>
+
+<table>
+<tr><th>Question</th><th>Skill (a file)</th><th>MCP server (you run it)</th></tr>
+<tr><td>Who runs it?</td><td>the client, for free</td><td>you host, or user runs <code>uvx</code></td></tr>
+<tr><td>Capability ceiling?</td><td>lexical / BM25 static index</td><td>embeddings, vector DB, live queries — none</td></tr>
+<tr><td>Ops cost?</td><td>~zero, offline</td><td>hosting, uptime, auth, updates</td></tr>
+<tr><td>Freshness?</td><td>re-ship the index (refresh)</td><td>query live / re-embed server-side</td></tr>
+<tr><td>Distribution?</td><td>a file (git, a marketplace)</td><td>a running endpoint + config</td></tr>
+<tr><td>Best when…</td><td>public/stable docs, wide reuse, offline, simple</td><td>private data, semantic search, central control, heavy queries</td></tr>
+</table>
+
+<figure>
+<div class="diagram">  same "grounded search + fetch" idea, two packages:
+
+  <span class="hi2">SKILL</span>  (a file you ship)              <span class="hi2">MCP SERVER</span>  (software you run)
+  ─────────────────────────            ──────────────────────────────
+  runs on client · no server           you host it, or user runs `uvx`
+  static BM25 index · no model         embeddings · vector DB · live
+  zero ops · offline · thin            real ops: hosting · uptime · auth
+  caps at lexical ranking              no capability ceiling
+  best: public, stable, wide reuse     best: private, semantic, central</div>
+<figcaption>Skill or server — pick by who runs it, what it must do, and who keeps benefiting.</figcaption>
+</figure>
+
+<p>For <em>this</em> story the skill won cleanly: public Teleport docs, a publisher
+manifest, BM25 is plenty, and the value is offline speed and determinism across many
+agents. An MCP would have added hosting for no correctness gain. But flip to
+<strong>internal docs</strong> that need semantic search and change daily, and the MCP
+becomes the honest choice.</p>
+
+<!-- Reinforce progressive discovery -->
+<div class="note">
+<span class="label">Whichever you ship — keep the index short (progressive discovery)</span>
+The consumer is an <em>LLM</em>, so teach it a <strong>protocol, not a corpus</strong>.
+The real <code>SKILL.md</code> was slimmed to ~112 lines, hiding index internals behind a
+<code>references/</code> file. As the corpus puts it: <em>"An LLM consumer needs to know
+HOW to invoke it and what it's good for, not how the index is built."</em> A short index
+that <strong>references out</strong> to advanced topics lets the agent discover detail
+only when it needs it — surfacing info in small bits. That is progressive discovery, and
+it applies to both skills and MCP tool descriptions.
+</div>
+
+<div class="roi">
+<span class="label">⏱️ Worth it? — the bookend</span>
+The most honest option is sometimes <em>neither</em>. If a model with web search already
+ties you on correctness (Lesson 8), and the docs are public and stable, the right call
+may be to <strong>skip the build</strong> and just let the agent search the web. Build a
+skill when offline/determinism/reuse pays for it. Build an MCP when only a server can do
+the job. Always weigh it against just doing the work.
+</div>
+</section>
+
+<!-- THE JOURNEY -->
+<section class="beatblock">
+<h2>The whole journey, in one breath</h2>
+<p>You built a real skill by <em>discovering</em> it — minimal design, test, improve:</p>
+<ol>
+<li><strong>Ground answers</strong>, don't trust memory — search + fetch (Lessons 1–2).</li>
+<li><strong>Search the body</strong>, not the label — the title-only blind spot (Lesson 3).</li>
+<li><strong>Prove it with evals</strong> you can't rig — body-only sampling, 15–0–1 (Lesson 4).</li>
+<li><strong>Pick what ships</strong> — TF-IDF over embeddings, for distribution (Lesson 5).</li>
+<li><strong>Normalize</strong> — BM25 dethrones the Changelog; raw counts lie (Lesson 6).</li>
+<li><strong>Index what people query</strong> — code blocks hold the identifiers (Lesson 7).</li>
+<li><strong>Reality-check honestly</strong> — ties web search; edge is speed/offline (Lesson 8).</li>
+<li><strong>Choose the package</strong> — skill vs MCP, by ops and capability (Lesson 9).</li>
+</ol>
+<p>Through all of it, the same two habits: <strong>🔴→🟢</strong> lock every fix with a
+test, and <strong>⏱️ ask if it's worth it.</strong> The deepest lesson from the corpus:
+<em>the harness mattered more than the model, and a measurement — not a smarter model —
+caught the one real flaw.</em></p>
+</section>
+
+<!-- WHAT YOU CAN DO NOW -->
+<div class="key">
+<span class="label">What you can do now (back to the mission)</span>
+Pick a corpus your team relies on. Check for an <code>llms.txt</code>. Sketch the
+search → fetch loop. Write three <em>body-only</em> evals before you build anything. Then
+decide, honestly: skill, MCP, or just web search? You now have the whole toolkit to make
+that call — and to defend it with a number.
+</div>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Final self-check (recall before you peek):</p>
+
+<details>
+<summary>1. The one-line trade between a skill and an MCP server?</summary>
+<p class="answer">Skill = thin to ship, zero ops, capped capability. MCP = richer
+capability (embeddings, vector DB, live), but real ops cost. Distribution vs. power.</p>
+</details>
+
+<details>
+<summary>2. Why do embeddings belong on the MCP side, not in a skill?</summary>
+<p class="answer">Searching with embeddings needs a model at query time, which can't ship
+in a static file — it needs the server an MCP provides.</p>
+</details>
+
+<details>
+<summary>3. What is progressive discovery, applied to a SKILL.md?</summary>
+<p class="answer">Keep the file a short index that references out to advanced topics, so the
+agent surfaces detail in small bits only when needed — teach a protocol, not a corpus.</p>
+</details>
+
+<details>
+<summary>4. When is the honest answer to build neither?</summary>
+<p class="answer">When web search already ties you on correctness and the docs are public
+and stable — skip the build unless offline/determinism/reuse pays for it.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> the
+<a href="https://modelcontextprotocol.io/docs/getting-started/intro">Model Context
+Protocol intro</a> and <a href="https://docs.trychroma.com/docs/overview/getting-started">Chroma's
+getting-started</a> for the server/semantic side. For the skill side, revisit the slimmed
+<a href="../../SKILL.md"><code>teleport-docs/SKILL.md</code></a> and Anthropic's
+<a href="https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices">skill
+authoring best practices</a>. Full list in <a href="../RESOURCES.md"><code>RESOURCES.md</code></a>.
+</div>
+
+<p class="ask">💬 You've finished the course — but I'm still your teacher. Ask me to help
+you scope a skill for your own corpus, draft its evals, or make the skill-vs-MCP call for
+real. That's where the wisdom comes: building one yourself.</p>
+
+<p>New terms (<code>MCP server</code>, <code>uvx</code>, <code>capability ceiling</code>,
+<code>client-dumb</code>, <code>protocol not a corpus</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0008-reality-check.html">← Lesson 8 · The reality check</a></span>
+<span><a href="../index.html">Course home ↺</a></span>
+</div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lesson components · reference</title>
+<link rel="stylesheet" href="course.css">
+<style>body{max-width:48rem} .src{background:#272727;color:#eee;padding:.8rem 1rem;border-radius:5px;font-family:var(--mono);font-size:.78rem;white-space:pre-wrap;overflow-x:auto;margin:.4rem 0 2rem}</style>
+</head>
+<body>
+<p class="kicker">Build a docs Skill · Author reference</p>
+<h1>Reusable lesson components</h1>
+<p>These are the shared building blocks for every lesson. Styles live in
+<code>course.css</code>. Copy the HTML snippet as-is so all lessons stay consistent.
+This page is for <em>authoring</em>, not for learners.</p>
+
+<h2>1. Beat markers (Why → What → How)</h2>
+<p>Every lesson opens its three beats with these.</p>
+<span class="beat why">Why · the problem</span>
+<span class="beat what">What · the solution approach</span>
+<span class="beat how">How · the mechanics</span>
+<div class="src">&lt;span class="beat why"&gt;Why · the problem&lt;/span&gt;
+&lt;span class="beat what"&gt;What · the solution approach&lt;/span&gt;
+&lt;span class="beat how"&gt;How · the mechanics&lt;/span&gt;</div>
+
+<h2>2. 🔴 → 🟢 Regression locked in</h2>
+<p>Ends every lesson from Lesson 4 onward. States the failure this lesson found (red) and
+the eval that now freezes it (green). This is how the course models test-first discipline.</p>
+<div class="redgreen">
+  <div class="rg-head">🔴 → 🟢 &nbsp; The regression we locked in</div>
+  <div class="rg-body">
+    <p><span class="red">Red:</span> what failed, and how it was measured.</p>
+    <p><span class="green">Green:</span> the eval that now asserts the fix — and stays in the suite forever.</p>
+  </div>
+</div>
+<div class="src">&lt;div class="redgreen"&gt;
+  &lt;div class="rg-head"&gt;🔴 → 🟢 &nbsp; The regression we locked in&lt;/div&gt;
+  &lt;div class="rg-body"&gt;
+    &lt;p&gt;&lt;span class="red"&gt;Red:&lt;/span&gt; what failed...&lt;/p&gt;
+    &lt;p&gt;&lt;span class="green"&gt;Green:&lt;/span&gt; the eval that asserts the fix...&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</div>
+
+<h2>3. ⏱️ Worth it? (ROI caveat)</h2>
+<p>Use wherever a lesson asks the learner to spend real effort. Keeps the honest question
+alive: does this ancillary work pay for itself, × how many agents reuse the skill?</p>
+<div class="roi">
+  <span class="label">⏱️ Worth it?</span>
+  The cost of this step, weighed against just doing the work — and who keeps benefiting.
+</div>
+<div class="src">&lt;div class="roi"&gt;
+  &lt;span class="label"&gt;⏱️ Worth it?&lt;/span&gt;
+  The cost of this step, weighed against just doing the work...
+&lt;/div&gt;</div>
+
+<h2>4. Tension line, callouts, diagram, quiz</h2>
+<p>Already in use; see <code>course.css</code> classes: <code>.tension</code>,
+<code>.note</code> / <code>.warn</code> / <code>.key</code>, <code>.diagram</code> (with
+<code>.hi</code> / <code>.hi2</code> spans), and <code>.quiz</code> with
+<code>&lt;details&gt;</code> for retrieval practice.</p>
+
+<p style="margin-top:2rem;font-size:.85rem;color:var(--muted)">Two recurring threads run on
+top of these: <strong>progressive discovery</strong> (each lesson sources more accurate
+data than the last) and the two boxes above (<strong>red→green</strong> +
+<strong>worth-it</strong>).</p>
+</body>
+</html>

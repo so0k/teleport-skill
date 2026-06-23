@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 · The grounding problem</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress"><b>●</b> ○ ○ ○ ○ ○ ○ ○ ○ &nbsp;&nbsp;Lesson 1 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>The grounding problem</h1>
+<p class="tension">Your agent just wrote the whole Teleport rollout plan — and the
+Terraform to match. Do you dare run <code>terraform apply</code>?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>You are not just chatting with the agent. You are <strong>planning real work</strong>
+with it. Picture a normal Monday:</p>
+
+<blockquote>
+"We're rolling out Teleport for the team and want SSO through Microsoft Entra ID using
+OIDC. How do I set up the OIDC auth connector, and how do I map Entra ID group claims to
+Teleport roles? I need the exact connector spec fields…"
+<cite>— eval 0, from the skill's real test set (<code>../../evals/evals.json</code>)</cite>
+</blockquote>
+
+<p>The agent writes a clean plan. It even hands you the <strong>Terraform</strong> to
+match (Teleport config is YAML, and the Terraform resources are very close). It looks
+complete. It sounds sure.</p>
+
+<p>But you are not pasting a chat reply into Slack. You are about to run this as
+<strong>infrastructure</strong>. So the stakes are different:</p>
+
+<ul>
+<li>It writes <code>access_request.roles</code> — but the real field is
+<code>access_request.<strong>spec</strong>.roles</code>. The plan is one word wrong.</li>
+<li>It writes the Terraform <code>role</code> using HCL <em>blocks</em>, but this
+provider wants nested <em>attributes</em> with <code>=</code>. It won't even plan.</li>
+<li>It invents a field like <code>auto_approve</code> that does not exist.</li>
+</ul>
+
+<p>These are not made up. Each one is a real bug the team hit, now frozen into the test
+set (evals 5, 6, 8). The shape is <em>almost</em> right — which is worse than wrong,
+because a high-risk plan that looks polished is the easiest one to trust.</p>
+
+<div class="warn">
+<span class="label">The grounding problem</span>
+The model answers from <strong>memory</strong> — what it saw in training. But Teleport
+adds resource kinds, role fields, and CLI flags <em>every release</em>, and renames
+things across versions. So a remembered field name is often quietly out of date. The
+plan looks confident. It is stale. And you were about to build on it.
+</div>
+
+<p class="tension">Here is the trap: the model is not dumb. It is <em>fluent</em>.
+And fluent feels like knowing.</p>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>The fix is not a smarter model. The fix is to make the agent <strong>read the docs
+first</strong>, ground every field in a real page, and cite that page. We call this
+<em>grounding</em>.</p>
+
+<p>We did not invent the shape of this. We <strong>copied a pattern that already
+works</strong>: the <strong>AWS Documentation MCP server</strong>. Ask yourself —
+<em>how does it ground an answer?</em> It is simpler than you'd guess. It gives the
+agent just two moves:</p>
+
+<ol>
+<li><strong>search</strong> — find the right doc page for the question.</li>
+<li><strong>fetch</strong> — pull that live page's text, and answer from its words.</li>
+</ol>
+
+<p>Search, then fetch. That's the whole core. The agent stops guessing field names and
+starts reading them. This little two-move loop is where our whole design started.</p>
+
+<div class="note">
+<span class="label">A useful frame</span>
+<strong>Agent = Model + Harness.</strong> The <em>model</em> writes text. The
+<em>harness</em> is everything around it — the instructions, the tools, the docs it can
+reach, the tests that check it. That search+fetch loop <em>is</em> harness. As our
+source puts it: <em>"the harness … matters more than the model itself."</em>
+</div>
+<blockquote>
+"Agent = Model + Harness" — "the harness (context structure, tooling, evaluation)
+matters more than the model itself."
+<cite>— CORPUS.md, Act B</cite>
+</blockquote>
+
+<p>One thing to file away for later: AWS ships that pattern as an <strong>MCP
+server</strong> — software you run. We ended up shipping ours as a <strong>skill</strong>
+— a thin file you hand to the agent. <em>Why we made that switch is the last lesson of
+this course.</em> For now, just hold the two-move loop: search → fetch.</p>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Same rollout question. Two ways to answer it. Watch where the field names come from.</p>
+
+<figure>
+<div class="diagram">  "Entra ID OIDC connector — which spec fields?"
+
+  <span class="hi">UNGROUNDED  (memory)</span>            <span class="hi2">GROUNDED  (search → fetch)</span>
+  ┌──────────────────┐               ┌──────────────────┐
+  │      model       │               │      model       │
+  │ recalls training │               │  1. search docs ─┼──▶ finds the connector page
+  │ guesses field    │               │  2. fetch page  ─┼──▶ reads the real fields
+  │ names            │               │  3. plan + cite  │
+  └────────┬─────────┘               └────────┬─────────┘
+           │                                  │
+           ▼                                  ▼
+  Terraform that looks right ⚠         fields copied from today's docs ✓
+  invents access_request.roles         access_request.spec.roles
+  no source                            links the page you can verify</div>
+<figcaption>The right-hand loop is the AWS Docs MCP pattern. It's what we build next.</figcaption>
+</figure>
+
+<p>You don't build anything yet. Keep one mechanic in your head: a grounded plan
+carries a <strong>source link for every field it claims</strong>. If a config can't
+point to a page, treat it as a guess — and never <code>apply</code> a guess.</p>
+
+<p>That habit — <em>"show me the page for this field"</em> — is the seed of the whole
+course. In <a href="0002-borrow-the-index.html">Lesson 2</a> we hit the obvious wall:
+<em>"search" sounds like we must index 765 doc pages ourselves. Do we?</em>
+(Hold that thought. The answer is a pleasant surprise.)</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (try before you open each answer):</p>
+
+<details>
+<summary>1. Why is a generated <em>plan</em> riskier than a chat reply?</summary>
+<p class="answer">You run it as infrastructure. A field that is one word wrong, or a
+HCL block where an attribute belongs, fails — or worse, applies the wrong thing.</p>
+</details>
+
+<details>
+<summary>2. What two moves did we borrow from the AWS Docs MCP server?</summary>
+<p class="answer">Search (find the right doc page) and fetch (pull that live page's
+text and answer from it). Search, then fetch.</p>
+</details>
+
+<details>
+<summary>3. Fill in: Agent = Model + ______. Which part does our search+fetch loop change?</summary>
+<p class="answer">Harness. The loop is part of the harness — the work around the model
+— not the model itself.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> Skim the shipped
+<a href="../../SKILL.md"><code>teleport-docs/SKILL.md</code></a> — just the top
+section. It tells the agent to "answer from the official docs, not from memory," and
+then lays out the <code>search → fetch → related</code> loop you just met. For the big
+picture, read Anthropic's
+<a href="https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills">Equipping
+agents for the real world with Agent Skills</a> (more in
+<a href="../RESOURCES.md"><code>RESOURCES.md</code></a>).
+</div>
+
+<p class="ask">💬 Stuck or curious? Ask me — I'm your teacher here. Good follow-ups:
+"show me the real Entra ID bug from eval 8," or "why did we copy an MCP but not ship one?"</p>
+
+<p>New terms (<code>grounding</code>, <code>harness</code>, <code>skill</code>,
+<code>search → fetch</code>) live in the
+<a href="../reference/glossary.html">course glossary</a>.</p>
+
+<div class="nav">
+<span>← &nbsp;Start of course</span>
+<span><a href="0002-borrow-the-index.html">Lesson 2 · Borrow the publisher's index →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

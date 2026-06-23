@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 2 · Borrow the publisher's index</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● <b>●</b> ○ ○ ○ ○ ○ ○ ○ &nbsp;&nbsp;Lesson 2 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Borrow the publisher's index</h1>
+<p class="tension">"Search the docs" sounds like we must scrape and index 765 pages
+ourselves. What if someone already did?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>In <a href="0001-the-grounding-problem.html">Lesson 1</a> we landed on a two-move
+loop: <strong>search → fetch</strong>. Search finds the right page; fetch reads it. Easy
+to say. But look closely at "search" and the work piles up fast:</p>
+
+<ul>
+<li>Crawl every page on <code>goteleport.com/docs</code> — hundreds of them.</li>
+<li>Strip the HTML: nav bars, menus, banners, footers. Keep only the real text.</li>
+<li>Build and store a search engine over all that text.</li>
+<li>Do it <em>again</em> on every release, or your index goes stale — the exact
+problem we set out to fix.</li>
+</ul>
+
+<p>That is a real project. It is brittle. And it is the kind of thing that quietly rots
+the moment you stop babysitting it.</p>
+
+<p class="tension">So before we build any of that, ask the lazy-but-smart question:
+has the publisher already done this work for us?</p>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+<p>Yes. More and more doc sites now publish an index <em>built for LLMs</em>. The
+format is called <strong><code>llms.txt</code></strong> — a plain text file at a known
+URL that lists the site's pages in a simple, machine-readable way. Teleport ships one.</p>
+
+<p>It gives us <strong>two gifts</strong> that map exactly onto our two moves:</p>
+
+<ol>
+<li><strong>A ready-made manifest</strong> (for <em>search</em>). One file,
+<code>goteleport.com/docs/llms.txt</code>, with <strong>765</strong> lines — one per
+page — each like <code>- [Title](url.md): one-line description</code>, grouped under
+<code>## Section</code> headings.</li>
+<li><strong>A clean markdown twin of every page</strong> (for <em>fetch</em>). Add
+<code>.md</code> to any doc URL and you get pure markdown — no HTML, no nav, no
+scraping. Each one even starts with its own <code>{"token_count": N}</code> so you know
+how big it is before you read it.</li>
+</ol>
+
+<blockquote>
+"Ships a valid <code>llms.txt</code> … 765 <code>- [Title](url.md): description</code>
+lines … Every page has a clean markdown twin … purpose-built LLM endpoints, no HTML
+scraping needed."
+<cite>— CORPUS.md, Act A</cite>
+</blockquote>
+
+<div class="key">
+<span class="label">The design call</span>
+We do not build an index. We <strong>borrow the publisher's.</strong> As the corpus puts
+it: <em>"Highest ROI given Teleport already did the indexing work."</em> Updating the
+skill becomes "re-fetch <code>llms.txt</code>" — not "re-crawl the site."
+</div>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Let's make it concrete. Here is what one manifest line and its markdown twin look
+like:</p>
+
+<pre><code># in goteleport.com/docs/llms.txt
+## Machine &amp; Workload Identity
+- [Deploy tbot on Linux](/docs/.../linux.md): Run the tbot agent on a Linux host.
+
+# then fetch the twin — just add .md, get clean markdown:
+GET goteleport.com/docs/.../linux.md
+{"token_count": 1840}
+# Deploy tbot on Linux
+You can run `tbot` as a systemd service ...
+</code></pre>
+
+<p>Now our Lesson 1 loop has real fuel. Watch where each move gets its data:</p>
+
+<figure>
+<div class="diagram">  question  ─▶  <span class="hi2">search</span>  ─▶  read llms.txt manifest      (765 one-line entries)
+                          │
+                          ▼  picks the best page
+              <span class="hi2">fetch</span>   ─▶  GET that page's .md twin   (clean markdown, token-counted)
+                          │
+                          ▼  not enough?
+              <span class="hi2">related</span> ─▶  list sibling pages         (same ## section)</div>
+<figcaption>The loop grows a third, optional move: <code>related</code> — siblings in the
+same manifest section, for when one page isn't enough.</figcaption>
+</figure>
+
+<p>Notice the shape: you only go as deep as the question needs. Most questions stop at
+<em>fetch</em>. You pull a full page <strong>only after</strong> search says which one.
+That restraint has a name worth knowing:</p>
+
+<div class="note">
+<span class="label">Progressive disclosure</span>
+Reveal information in layers, smallest first. The agent reads cheap one-line entries to
+choose a page, then spends tokens on the full page <em>only</em> for the one it picked —
+instead of dumping all 765 pages into its context. It keeps the agent fast and its
+context small. We'll meet this idea again — applied to the skill file itself.
+</div>
+
+<p>So the whole "search engine" we feared in the Why section? For a site with an
+<code>llms.txt</code>, step one is nearly free.</p>
+
+<p class="tension">But here's the crack we'll fall into next. Our manifest line only
+holds a <em>title</em> and a <em>one-line description</em>. So what happens when the word
+you need — say an error string, or a config key like <code>pg_hba.conf</code> — never
+appears in either, only deep in the page body?</p>
+<p>That blind spot is <a href="0003-the-title-blind-spot.html">Lesson 3</a>.</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. What does an <code>llms.txt</code> file give us, in one sentence?</summary>
+<p class="answer">A ready-made manifest of every doc page (title + url + one-line
+description), built for LLMs, so we don't have to crawl or index the site ourselves.</p>
+</details>
+
+<details>
+<summary>2. How do you "fetch" a page's clean text, and why is it nice?</summary>
+<p class="answer">Add <code>.md</code> to the doc URL — you get pure markdown with no HTML
+or nav to strip, plus a token count up front. No scraping needed.</p>
+</details>
+
+<details>
+<summary>3. What is progressive disclosure, in the search → fetch loop?</summary>
+<p class="answer">Read cheap one-line entries first to pick a page, then spend tokens on
+the full page only for the one you picked — go only as deep as the question needs.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> The
+<a href="https://llmstxt.org/">llms.txt specification</a> — short and readable. See how
+a manifest is structured, then look at Teleport's real one at
+<a href="https://goteleport.com/docs/llms.txt"><code>goteleport.com/docs/llms.txt</code></a>
+and add <code>.md</code> to any page to see a twin. Background:
+<a href="https://www.answer.ai/posts/2024-09-03-llmstxt.html">Jeremy Howard's original
+proposal</a>.
+</div>
+
+<p class="ask">💬 Ask your teacher: "show me a real llms.txt line and its twin
+side by side," or "what do sites without an llms.txt force us to do instead?"</p>
+
+<p>New terms (<code>llms.txt</code>, <code>manifest</code>, <code>markdown twin</code>,
+<code>related</code>, <code>progressive disclosure</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0001-the-grounding-problem.html">← Lesson 1 · The grounding problem</a></span>
+<span><a href="0003-the-title-blind-spot.html">Lesson 3 · The title-only blind spot →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

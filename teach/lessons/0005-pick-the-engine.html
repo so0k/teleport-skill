@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 5 · Pick the engine</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● ● <b>●</b> ○ ○ ○ ○ &nbsp;&nbsp;Lesson 5 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>Pick the engine</h1>
+<p class="tension">The smartest search tech is right there. Why would we pick the
+simplest math instead?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>Lesson 4 proved it with a number: we need <strong>full-text search</strong>. Now the
+real question — how do we <em>build</em> it, and how do we <strong>ship</strong> it?</p>
+
+<p>Two tempting options jump out, both "better" on paper:</p>
+<ul>
+<li><strong>Copy the site's own search.</strong> goteleport.com already has great search.
+Just reuse it.</li>
+<li><strong>Use embeddings (semantic search).</strong> The modern AI way — it matches
+<em>meaning</em>, not just words. Surely that beats plain word-matching.</li>
+</ul>
+
+<p>But before we fall for either, remember what a skill actually <em>is</em>:</p>
+
+<div class="key">
+<span class="label">The constraint that decides everything</span>
+A <strong>skill is a file other agents download.</strong> It has to run on someone else's
+machine with no server you control, no secret keys, no big model loaded. So the right
+question is not "which search is smartest?" It's <strong>"which search can ship as a
+plain file and still work?"</strong>
+</div>
+
+<p>That one constraint quietly kills both fancy options. Let's watch it happen.</p>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+
+<p><strong>Option 1 — the site's search (Inkeep). Rejected: brittle.</strong> The live
+docs use a hosted AI search called Inkeep. To call it, you'd have to get past a
+security gate (a "proof-of-work" puzzle) whose exact rules are buried in minified
+JavaScript that can change any day. Hardcode it and your skill breaks the next time they
+ship.</p>
+<blockquote>
+"the Inkeep JS can change whenever they want — hardcoding the algo is a brittle
+maintenance trap."
+<cite>— CORPUS.md, Act C</cite>
+</blockquote>
+
+<p><strong>Option 2 — embeddings / vector search. Rejected: you can't ship it.</strong>
+Here's the catch most people miss. To search with embeddings, you turn each page into a
+list of numbers (a "vector") using a model. Fine — do that once at build time. But to
+search, you must turn the <em>user's question</em> into a vector too — and that needs the
+<strong>same model, running on the client</strong>, every single query. You cannot pack a
+model into a static file.</p>
+<blockquote>
+"the client also needs to run the same embedding model … unless you serve this as an MCP
+server?"
+<cite>— CORPUS.md, Act C</cite>
+</blockquote>
+<p>So embeddings only work if you <em>host a server</em>. Park that thought —
+it's the road we weigh in <a href="0009-skill-vs-mcp.html">Lesson 9</a>.</p>
+
+<p><strong>The winner — TF-IDF. Just arithmetic.</strong> It scores pages by counting
+words. No model. No server. No gate. You do the math once, save the numbers in a JSON
+file, and ship that file inside the skill.</p>
+<blockquote>
+"TF-IDF is just arithmetic … No model, no training, no GPU." … "No auth, no PoW, no
+browser, no model."
+<cite>— CORPUS.md, Act C</cite>
+</blockquote>
+
+<div class="roi">
+<span class="label">⏱️ Worth it?</span>
+Be honest about <em>why</em> TF-IDF won: not because it retrieves best — because it
+<strong>ships</strong>. We traded some search smarts for zero runtime cost and zero
+maintenance. For a file other agents download, that trade is almost always right. (When
+it isn't, you host a server — Lesson 9.)
+</div>
+</section>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+
+<p>The whole decision in one picture:</p>
+<figure>
+<div class="diagram">  "How do we build &amp; ship full-text search?"
+        │
+        ├─ Inkeep (site's own) ─▶ hosted + security gate + minified JS ─▶ <span class="hi">✗ brittle trap</span>
+        ├─ Embeddings (vectors)─▶ query needs the model too, every time ─▶ <span class="hi">✗ needs a server</span>
+        └─ TF-IDF (arithmetic) ─▶ bake the numbers into a JSON file     ─▶ <span class="hi2">✓ ships as a file</span></div>
+<figcaption>Same goal, three engines. Only one survives "must ship as a plain file."</figcaption>
+</figure>
+
+<p>TF-IDF is two simple ideas multiplied together:</p>
+<ul>
+<li><strong>TF — term frequency.</strong> A word that appears a lot <em>in a page</em> is
+probably important to that page.</li>
+<li><strong>IDF — inverse document frequency.</strong> A word in <em>almost every</em>
+page (like "the" or "teleport") tells you nothing. A <em>rare</em> word (like
+<code>pg_hba.conf</code>) is a strong signal. So weight rare words higher:
+<code>IDF = log(total pages / pages containing the word)</code>.</li>
+</ul>
+<p>Multiply them — <code>weight = TF × IDF</code> — add up the weights of the query's
+words for each page, and the highest total wins. That's it.</p>
+
+<p>The shipping trick is <em>when</em> you do the math:</p>
+<figure>
+<div class="diagram">  <span class="hi2">BUILD TIME</span> (once, offline)            <span class="hi2">QUERY TIME</span> (in the skill, every search)
+  download 765 .md twins              read the query's words
+  count words, compute TF×IDF         look up their saved weights
+  save ─▶ search-index.json (~4 MB)   add them up, sort, return top pages
+  ship the file in the repo           no model · no GPU · no network</div>
+<figcaption>All the cost is paid once, at build time. The shipped skill just adds numbers.</figcaption>
+</figure>
+
+<p>This is the <strong>build-time vs query-time split</strong>: heavy work happens once
+when you build the index; the downloaded skill does only cheap lookups. It's also the
+next short round of <em>Agile iteration</em> — we've gone from "search the title" to
+"search the body by word weight," each round tested before the next.</p>
+
+<p>One honesty note to carry forward: the body-only evals from
+<a href="0004-evals-sample-the-blind-spot.html">Lesson 4</a> are now our
+<strong>contract</strong>. Whatever engine we pick must pass them. TF-IDF does.</p>
+
+<p class="tension">But here's the trap waiting in that simple <code>weight = TF × IDF</code>.
+A huge page — say a 3,000-line changelog — contains <em>every</em> word many times. What
+happens to our ranking when sheer page size starts winning?</p>
+<p>That's <a href="0006-raw-counts-lie.html">Lesson 6</a>: raw counts lie.</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. What single constraint decided the engine?</summary>
+<p class="answer">A skill is a file other agents download — so the search must ship as a
+plain file and work with no server, keys, or model. "Which ships?", not "which is
+smartest?"</p>
+</details>
+
+<details>
+<summary>2. Why can't embeddings ship inside a static skill?</summary>
+<p class="answer">To search, the client must turn each query into a vector using the same
+model — and you can't pack a model into a file. Embeddings need a hosted server.</p>
+</details>
+
+<details>
+<summary>3. What does IDF do, in plain words?</summary>
+<p class="answer">It weights rare words higher and common words lower — a word in almost
+every page tells you nothing; a rare one is a strong signal.</p>
+</details>
+
+<details>
+<summary>4. What is the build-time vs query-time split?</summary>
+<p class="answer">Do the heavy math once at build time and save the numbers; the shipped
+skill only does cheap lookups and addition at query time — no model, no GPU.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> the IR textbook on
+<a href="https://nlp.stanford.edu/IR-book/html/htmledition/tf-idf-weighting-1.html">tf-idf
+weighting</a> (Manning, Raghavan, Schütze) — the authoritative, short version of the math.
+For the embeddings road not taken, skim
+<a href="https://platform.claude.com/docs/en/build-with-claude/embeddings">Claude's
+embeddings docs</a> (note: you need a model at query time — that's the catch).
+</div>
+
+<p class="ask">💬 Ask your teacher: "show me a TF-IDF score worked out on a real query,"
+or "when <em>would</em> embeddings be worth hosting a server for?"</p>
+
+<p>New terms (<code>TF-IDF</code>, <code>term frequency</code>, <code>IDF</code>,
+<code>embeddings / vector search</code>, <code>build-time vs query-time</code>,
+<code>static index</code>) are in the <a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0004-evals-sample-the-blind-spot.html">← Lesson 4 · Evals</a></span>
+<span><a href="0006-raw-counts-lie.html">Lesson 6 · Raw counts lie →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

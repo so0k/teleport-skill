@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 8 · The reality check</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+
+<p class="progress">● ● ● ● ● ● ● <b>●</b> ○ &nbsp;&nbsp;Lesson 8 of 9</p>
+<p class="kicker">Build a docs Skill · A brown-bag</p>
+<h1>The reality check</h1>
+<p class="tension">We built a great search. But did we just build a slower Google?</p>
+
+<!-- WHY -->
+<section class="beatblock">
+<span class="beat why">Why · the problem</span>
+<p>By <a href="0007-index-the-code-blocks.html">Lesson 7</a> the search is genuinely
+good: body, BM25, code blocks, all guarded by evals. Time to ask the question we've been
+ducking.</p>
+
+<p>A plain model with <strong>web search</strong> can read these <em>same</em> Teleport
+docs — Google indexed them long ago. So is our skill actually <strong>better</strong>?
+Or did we spend all this effort rebuilding something the model could already reach?</p>
+
+<p>To answer honestly, we run an A/B test: the <strong>same questions</strong>, once
+<em>with</em> the skill, once <em>without</em>. Simple. Except "without" is where two
+nasty traps hide — and falling into either gives you a confident, wrong answer.</p>
+
+<div class="warn">
+<span class="label">The honest goal</span>
+We are not trying to prove the skill wins. We are trying to find out the <em>truth</em>.
+If the honest answer is "it barely beats web search," we want to know that — and say it.
+</div>
+</section>
+
+<!-- WHAT -->
+<section class="beatblock">
+<span class="beat what">What · the solution approach</span>
+
+<p><strong>Trap 1 — a contaminated baseline.</strong> The first A/B was a lie. The skill
+lived in <code>~/.claude/skills/</code>, where it's visible to <em>every</em> subagent —
+including the "baseline" ones. They had a pushy description, so the baselines quietly
+used the skill too. We compared the skill… to itself.</p>
+<blockquote>
+"those baselines are really with-skill runs and must be redone."
+<cite>— CORPUS.md, §4 (the contamination crisis)</cite>
+</blockquote>
+<p>The fix: <strong>isolate the variable.</strong> Physically move the skill aside, and
+hide the local docs checkout one baseline was caught grepping. Only then is "without"
+really without.</p>
+
+<p><strong>Trap 2 — the baseline you pick decides the result.</strong> This is the deep
+one:</p>
+<ul>
+<li>Compare against a <strong>web-enabled</strong> model and the skill <em>ties</em> —
+because that model just looks up the same public docs. You've tested nothing about
+grounding; both sides are grounded.</li>
+<li>Compare against a <strong>training-only</strong> model (no tools, "Claude in the
+wild") and a real gap appears — the bare model invents schema it can't verify from
+memory.</li>
+</ul>
+<div class="key">
+<span class="label">Choosing the baseline IS the experiment</span>
+The number you get depends entirely on who you race against. So pick the baseline that
+isolates the exact property you claim. If you claim "grounding," race the model that
+can't ground. If you claim "beats web search," race web search — and accept the answer.
+</div>
+</section>
+
+<!-- YOUR TURN -->
+<div class="quiz">
+<p class="q">Your turn — predict before the reveal.</p>
+<p>We race the finished skill against a model that <em>can</em> use web search over the
+same public Teleport docs. On correctness, what happens — and what's left for the skill
+to win on?</p>
+<details>
+<summary>Reveal the result</summary>
+<p class="answer">Correctness <strong>ties: 13/13 vs 13/13.</strong> The web model reads
+the same docs through Google, so it's just as correct. What's left is <em>how</em>: the
+skill is <strong>~29% faster</strong> (76s vs 107s) and fully offline/deterministic. The
+edge is speed and reliability — <em>not</em> raw capability.</p>
+</details>
+</div>
+
+<!-- HOW -->
+<section class="beatblock">
+<span class="beat how">How · the mechanics</span>
+<p>Same skill, two opponents, two completely different verdicts:</p>
+
+<figure>
+<div class="diagram">  Same questions. Different opponent. Different story.
+
+  <span class="hi2">vs TRAINING-ONLY model</span>          <span class="hi2">vs WEB-ENABLED model</span>
+  (answers from memory)             (looks up goteleport.com)
+  ──────────────────────            ─────────────────────────
+  skill     12 / 12                 skill     13 / 13
+  baseline   6 / 12   ◀ big gap     baseline  13 / 13   ◀ tie
+  → grounding clearly wins          → correctness tie;
+                                      skill ~29% faster (76s vs 107s)
+                                      edge = speed / determinism / offline</div>
+<figcaption>The skill's measured value swings entirely on which baseline you choose.</figcaption>
+</figure>
+
+<blockquote>
+"13/13 vs 13/13 — identical correctness to a web_search baseline, but the skill is
+<strong>29% faster</strong> (76s vs 107s mean) … the skill's edge is
+<strong>speed/determinism/offline-search, not raw capability.</strong>"
+<cite>— CORPUS.md, Act I (the honest final read)</cite>
+</blockquote>
+
+<p>So we describe the skill by its <em>true</em> edge. Not "more accurate than the web" —
+that's false. But "as accurate, and faster, deterministic, and works offline" — that's
+true, and genuinely useful.</p>
+
+<div class="roi">
+<span class="label">⏱️ Worth it? — the honest verdict</span>
+For <strong>public</strong> docs Google already indexed, the skill barely beats web
+search on correctness — its payoff is speed/determinism/offline. That may or may not be
+worth the build, depending on reuse. But flip the corpus: for <strong>internal /
+private</strong> docs Google can't see, there <em>is no</em> web baseline — grounding is
+the whole game, and the skill (or a server) is the only honest path. Same technique,
+very different ROI. Know which world you're in.
+</div>
+
+<div class="redgreen">
+  <div class="rg-head">🔴 → 🟢 &nbsp; The regression we locked in</div>
+  <div class="rg-body">
+    <p><span class="red">Red:</span> the first A/B was contaminated — a global skill leaked
+    into the baselines, so they secretly used it. The "comparison" measured nothing.</p>
+    <p><span class="green">Green:</span> isolate the variable — move the skill aside, hide
+    the local docs — and pick the baseline that matches the claim. Now the result is
+    honest (13/13 tie vs web; clear win vs training-only), and the eval set encodes it.</p>
+  </div>
+</div>
+
+<p class="tension">Here's the thread pulling into our last lesson. For public docs the
+skill <em>ties</em> web search. Embeddings might rank better — but they need a server. So
+when is shipping a skill even the right call… and when should you host an
+<strong>MCP server</strong> instead?</p>
+<p>That's where we started, and where we finish: <a href="0009-skill-vs-mcp.html">Lesson
+9</a>.</p>
+</section>
+
+<!-- RETRIEVAL PRACTICE -->
+<div class="quiz">
+<p class="q">Quick self-check (recall before you peek):</p>
+
+<details>
+<summary>1. How did a global skill contaminate the baseline?</summary>
+<p class="answer">It lived in <code>~/.claude/skills/</code>, visible to every subagent,
+so the "baseline" runs secretly used it too — an A/A test dressed up as A/B.</p>
+</details>
+
+<details>
+<summary>2. Why does "choosing the baseline IS the experiment"?</summary>
+<p class="answer">The result depends on who you race: a web-enabled model ties (both
+grounded); a training-only model loses (it hallucinates). Pick the baseline that isolates
+the property you claim.</p>
+</details>
+
+<details>
+<summary>3. What is the skill's honest edge vs web search on public docs?</summary>
+<p class="answer">Not correctness — that ties. Speed, determinism, and offline search
+(~29% faster). For internal docs with no web baseline, grounding itself is the edge.</p>
+</details>
+</div>
+
+<!-- FOOTER -->
+<footer class="lesson-footer">
+<div class="source">
+<strong>Read next (primary source):</strong> the IR textbook on
+<a href="https://nlp.stanford.edu/IR-book/html/htmledition/evaluation-in-information-retrieval-1.html">evaluation</a>
+— especially why a fair test needs a controlled comparison. The contamination + baseline
+story is CORPUS.md §4 and Act I; worth reading in full for the honest framing.
+</div>
+
+<p class="ask">💬 Ask your teacher: "how would I run a clean A/B on my own machine?" or
+"what changes for internal docs Google can't index?"</p>
+
+<p>New terms (<code>baseline</code>, <code>contamination</code>, <code>A/B test</code>,
+<code>isolate the variable</code>, <code>honest edge / overclaiming</code>) are in the
+<a href="../reference/glossary.html">glossary</a>.</p>
+
+<div class="nav">
+<span><a href="0007-index-the-code-blocks.html">← Lesson 7 · Index the code blocks</a></span>
+<span><a href="0009-skill-vs-mcp.html">Lesson 9 · Skill vs MCP server →</a></span>
+</div>
+</footer>
+
+</body>
+</html>

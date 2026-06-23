@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Course Glossary · Build a docs Skill</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  dl.glossary dt {
+    font-family: var(--sans); font-weight: 700; margin-top: 1.3rem;
+    color: var(--accent-2); font-size: 1rem;
+  }
+  dl.glossary dt code { font-size: .9em; }
+  dl.glossary dd { margin: .25rem 0 0; }
+  dl.glossary dd .first { color: var(--muted); font-size: .8rem; font-family: var(--sans); }
+  .index-letters { font-family: var(--sans); font-size: .85rem; color: var(--muted); margin: 1rem 0 2rem; }
+</style>
+</head>
+<body>
+
+<p class="kicker">Build a docs Skill · Reference</p>
+<h1>Course glossary</h1>
+<p>Plain-language definitions for every term in the course. We keep these <em>stable</em>:
+once a word is defined here, every lesson uses it the same way. Skim it before a lesson,
+or come back when a word trips you up.</p>
+
+<dl class="glossary">
+
+<dt>Grounding</dt>
+<dd>Answering from a real source you fetched, not from the model's memory. A grounded
+answer can show you the exact page it used.
+<span class="first">First seen: Lesson 1</span></dd>
+
+<dt>Harness</dt>
+<dd>Everything around the model: instructions, tools, the docs it can reach, and the
+tests that check it. Captured by <em>Agent = Model + Harness</em>. A skill is part of
+the harness. <span class="first">First seen: Lesson 1</span></dd>
+
+<dt>Skill</dt>
+<dd>A small package you ship to an agent — a <code>SKILL.md</code> file plus optional
+helper scripts and data — that teaches it <em>how</em> to do one job well (here:
+search and read the Teleport docs). It changes the harness, not the model.
+<span class="first">First seen: Lesson 1</span></dd>
+
+<dt><code>SKILL.md</code></dt>
+<dd>The main file of a skill. It has a short YAML header (a <code>name</code> and a
+<code>description</code> that help the agent decide <em>when</em> to use the skill) and
+a body that teaches the <em>steps</em> to follow. <span class="first">First seen: Lesson 1 (full detail in Lesson 2)</span></dd>
+
+<dt><code>search → fetch</code> (the protocol)</dt>
+<dd>The two-move loop at the heart of the skill. <strong>Search</strong> finds the right
+doc page for a question; <strong>fetch</strong> pulls that live page's text so the agent
+answers from real words. We borrowed this shape from the AWS Docs MCP server. Later it
+grows a third optional move, <code>related</code> (sibling pages).
+<span class="first">First seen: Lesson 1 (full detail in Lesson 2)</span></dd>
+
+<dt><code>llms.txt</code></dt>
+<dd>A plain-text index a website publishes <em>for LLMs</em>, at a known URL
+(e.g. <code>goteleport.com/docs/llms.txt</code>). It lists every page as
+<code>- [Title](url.md): description</code> under <code>## Section</code> headings. We
+search this instead of crawling the site. <span class="first">First seen: Lesson 2</span></dd>
+
+<dt>Manifest</dt>
+<dd>The list of pages inside an <code>llms.txt</code> — title + URL + one-line
+description, one entry per page. This is what our <em>search</em> move reads.
+<span class="first">First seen: Lesson 2</span></dd>
+
+<dt>Markdown twin</dt>
+<dd>The clean markdown version of a doc page, served when you add <code>.md</code> to its
+URL. No HTML, no nav to strip; starts with a <code>{"token_count": N}</code> line. This
+is what our <em>fetch</em> move pulls. <span class="first">First seen: Lesson 2</span></dd>
+
+<dt><code>related</code> (the third move)</dt>
+<dd>An optional follow-up to <code>search → fetch</code>: list the sibling pages in the
+same manifest section, for when one page isn't enough.
+<span class="first">First seen: Lesson 2</span></dd>
+
+<dt>Progressive disclosure / progressive discovery</dt>
+<dd>The harness surfaces relevant info in <em>small bits</em>, and the LLM decides whether
+to dive deeper. Read cheap one-line entries to pick a page, then spend tokens on the full
+page only for the one you picked — go only as deep as the question needs. Applies to the
+skill file itself: a <strong>short <code>SKILL.md</code> index that references out</strong>
+to advanced topics and workflows, instead of dumping everything up front. Keeps the agent
+fast and its context small. (Not to be confused with <em>Agile iteration</em>, the
+build → test → improve loop.) <span class="first">First seen: Lesson 2</span></dd>
+
+<dt>Title-only search</dt>
+<dd>Searching only the manifest line — a page's title and one-line description. Cheap and
+fast, but blind to anything in the page body. What we start with.
+<span class="first">First seen: Lesson 3</span></dd>
+
+<dt>Full-text (content) search</dt>
+<dd>Searching the entire page body, not just its label. Finds error strings, config keys,
+file names, and CLI flags that live deep in a page. What we want.
+<span class="first">First seen: Lesson 3</span></dd>
+
+<dt>Body-only query</dt>
+<dd>A question whose key words appear only in a page's body, never in its title or
+description. The exact case title-only search misses and full-text search catches.
+<span class="first">First seen: Lesson 3</span></dd>
+
+<dt>Complete miss (rank 0)</dt>
+<dd>When the correct page shares no words with the label the search reads, so it never
+matches — the right answer scores zero. <span class="first">First seen: Lesson 3</span></dd>
+
+<dt>Eval</dt>
+<dd>A test for an agent or skill: a question plus what a good answer must contain (and
+must <em>not</em> contain). Run it to check the skill still works.
+<span class="first">First seen: Lesson 4</span></dd>
+
+<dt>Benchmark</dt>
+<dd>Running many evals to compare two approaches by a number — e.g. title-only vs
+full-text, scored as wins. Turns "better" from opinion into evidence.
+<span class="first">First seen: Lesson 4</span></dd>
+
+<dt>Regression bar</dt>
+<dd>An eval kept forever to stop a fixed bug from coming back. Every past failure becomes
+a permanent assertion. <span class="first">First seen: Lesson 4</span></dd>
+
+<dt>Red → green</dt>
+<dd>Test-first discipline: write the failing test first (red), then build the fix that
+makes it pass (green) — and keep the test as a regression bar. In this project, the
+body-only evals were written <em>before</em> the better engine existed.
+<span class="first">First seen: Lesson 4</span></dd>
+
+<dt>Agile iteration (short feedback loops)</dt>
+<dd>Ship a minimal design, put it to the test, improve — in short rounds. Each round
+sources more accurate data than the last: borrow the index → search the body → rank by
+density (BM25) → index code blocks. Pairs with <em>red → green</em>: every round's fix is
+locked by a test. (This is NOT progressive discovery — see below.)
+<span class="first">First seen: Lesson 4</span></dd>
+
+<dt>Worth-it lens (ROI)</dt>
+<dd>The habit of weighing ancillary work (indexing, evals, tuning) against just doing the
+real task — times how many agents will reuse the skill. Sometimes the honest answer is
+"don't build it." <span class="first">First seen: Lesson 4</span></dd>
+
+<dt>TF-IDF</dt>
+<dd>A way to rank pages by counting words — "just arithmetic," no model needed.
+<code>weight = TF × IDF</code>, summed over the query's words. Chosen because it
+<em>ships</em> as a static file, not because it retrieves best.
+<span class="first">First seen: Lesson 5</span></dd>
+
+<dt>Term frequency (TF)</dt>
+<dd>How often a word appears in a page. A word used a lot in a page is probably important
+to that page. <span class="first">First seen: Lesson 5</span></dd>
+
+<dt>Inverse document frequency (IDF)</dt>
+<dd>How rare a word is across all pages: <code>log(total pages / pages with the word)</code>.
+Rare words score high (strong signal); words in nearly every page score low.
+<span class="first">First seen: Lesson 5</span></dd>
+
+<dt>Embeddings / vector search</dt>
+<dd>Turning text into lists of numbers (vectors) with a model, then matching by meaning.
+Powerful, but to search you need the same model at query time — so it can't ship in a
+static file; it needs a hosted server. <span class="first">First seen: Lesson 5 (weighed in Lesson 9)</span></dd>
+
+<dt>Build-time vs query-time</dt>
+<dd>Do the heavy math once when you build the index (download pages, compute weights, save
+JSON); the shipped skill does only cheap lookups and addition at query time — no model, no
+GPU. <span class="first">First seen: Lesson 5</span></dd>
+
+<dt>Static index</dt>
+<dd>The search data shipped as a plain file (here a ~4 MB <code>search-index.json</code>),
+so the skill works offline with no server. <span class="first">First seen: Lesson 5</span></dd>
+
+<dt>BM25</dt>
+<dd>A small, standard upgrade to TF-IDF that adds length normalization and saturation.
+Still just arithmetic, still baked at build time. Fixes long pages winning by size.
+We use <code>k1 = 1.2</code>, <code>b = 0.75</code>. <span class="first">First seen: Lesson 6</span></dd>
+
+<dt>Length normalization</dt>
+<dd>Dividing a word's score by how long the page is versus the average, so a big page
+gets no free boost. BM25's <code>b</code> knob. <span class="first">First seen: Lesson 6</span></dd>
+
+<dt><code>k1</code> (saturation)</dt>
+<dd>BM25 knob that makes repeated words count for less each time — a word appearing 20×
+isn't 20× as relevant. <span class="first">First seen: Lesson 6</span></dd>
+
+<dt><code>b</code> (length knob)</dt>
+<dd>BM25 knob (0–1) controlling how strongly to normalize by page length.
+<code>b = 0.75</code> is the standard choice. <span class="first">First seen: Lesson 6</span></dd>
+
+<dt>Density vs frequency</dt>
+<dd>Raw frequency rewards long pages. Density (frequency relative to page length) is
+closer to relevance. "Frequency ≠ density ≠ relevance." <span class="first">First seen: Lesson 6</span></dd>
+
+<dt>Code fence</dt>
+<dd>A block of code or config in markdown, wrapped in triple backticks (```). Config keys,
+CLI flags, and file names live here. Our first indexer wrongly skipped these.
+<span class="first">First seen: Lesson 7</span></dd>
+
+<dt>Tokenize</dt>
+<dd>Break text into individual words ("tokens") so they can be indexed and searched. We
+tokenize code-fence content into a page's search text. <span class="first">First seen: Lesson 7</span></dd>
+
+<dt>Preview snippet</dt>
+<dd>The short (~500-char) human-readable summary shown next to a search result. Kept clean
+— code identifiers go into the search text but not into this. <span class="first">First seen: Lesson 7</span></dd>
+
+<dt>Identifier</dt>
+<dd>An exact name a platform engineer searches for: a config key, CLI flag, file name, or
+error string (e.g. <code>mysqld</code>, <code>pg_hba.conf</code>). The skill's core value
+is finding these; they live mostly in code blocks. <span class="first">First seen: Lesson 7</span></dd>
+
+<dt>Baseline</dt>
+<dd>What you compare the skill against in a test — e.g. a model with web search, or a
+model answering from memory only. Choosing it carefully is the whole experiment.
+<span class="first">First seen: Lesson 8</span></dd>
+
+<dt>Contamination</dt>
+<dd>When the thing you're testing leaks into the "control" — here a global skill in
+<code>~/.claude/skills/</code> that every subagent (including baselines) could use. Turns
+an A/B test into a meaningless A/A. <span class="first">First seen: Lesson 8</span></dd>
+
+<dt>A/B test</dt>
+<dd>Run the same questions two ways — with the skill (A) and without (B) — and compare.
+Only fair if B is truly without. <span class="first">First seen: Lesson 8</span></dd>
+
+<dt>Isolate the variable</dt>
+<dd>Make sure only one thing differs between A and B. Move the skill aside, hide any local
+docs the baseline could grep — so you measure the skill, not leakage.
+<span class="first">First seen: Lesson 8</span></dd>
+
+<dt>Honest edge / overclaiming</dt>
+<dd>Describe a tool by what it truly does better. The skill ties web search on correctness
+but wins on speed/determinism/offline — say <em>that</em>, not a false "more accurate."
+<span class="first">First seen: Lesson 8</span></dd>
+
+<dt>AWS Docs MCP server</dt>
+<dd>Amazon's documentation tool for agents. It works by giving the agent a
+<em>search</em> tool plus a <em>fetch</em> for live docs — the exact pattern we copied to
+start this design. It ships as an MCP server (software you run), which is the road we
+compare against in the final lesson. <span class="first">First seen: Lesson 1</span></dd>
+
+<dt>MCP server (Model Context Protocol)</dt>
+<dd>A small service the agent talks to over a standard protocol to get tools or data.
+Unlike a skill (a file you ship), an MCP server is software you <em>run</em> — hosted,
+or started on the user's machine (e.g. via <code>uvx</code>). No capability ceiling
+(embeddings, vector DB, live queries), but real ops cost.
+<span class="first">First seen: Lesson 1 (decided in Lesson 9)</span></dd>
+
+<dt><code>uvx</code></dt>
+<dd>A tool that runs a Python program on the user's machine without a manual install. One
+way to run an MCP server locally instead of hosting it.
+<span class="first">First seen: Lesson 9</span></dd>
+
+<dt>Capability ceiling</dt>
+<dd>The limit on what a package can do. A skill (static file) caps at lexical/BM25 search;
+an MCP server has no ceiling because it can run any code or model.
+<span class="first">First seen: Lesson 9</span></dd>
+
+<dt>Client-dumb</dt>
+<dd>Keeping the agent/client simple by putting the heavy work (embeddings, vector search)
+on a server. The MCP approach. <span class="first">First seen: Lesson 9</span></dd>
+
+<dt>Protocol, not a corpus</dt>
+<dd>The skill's consumer is an LLM, so teach it <em>how to invoke</em> the tool and what
+it's good for — not the data or the internals. Why <code>SKILL.md</code> stays short and
+references out. <span class="first">First seen: Lesson 9</span></dd>
+
+</dl>
+
+<div class="note">
+<span class="label">This glossary grows</span>
+More terms land here as the course moves on — <em>llms.txt</em>, <em>progressive
+disclosure</em>, <em>TF-IDF</em>, <em>BM25</em>, <em>eval</em>, <em>baseline</em>,
+<em>embedding</em>, and more. Each new lesson adds its words and marks where they first
+appear.
+</div>
+
+<p style="margin-top:2.5rem;"><a href="../lessons/0001-the-grounding-problem.html">← Back to Lesson 1</a></p>
+
+</body>
+</html>
